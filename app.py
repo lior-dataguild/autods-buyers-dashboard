@@ -1,167 +1,198 @@
 import altair as alt
 import pandas as pd
 import streamlit as st
-from google.cloud import bigquery
-from google.oauth2 import service_account
 
-PROJECT_ID = "dg-demo-data"
-DATASET = "demo_autods_demo_v1_v1"
+import data
+import theme as th
 
-BAR_BLUE = "#2563EB"
-INK = "#111827"
-MUTED = "#6B7280"
-GRID = "#E5E7EB"
+st.set_page_config(page_title="DG — Data Guild", layout="wide")
+st.markdown(th.css(), unsafe_allow_html=True)
 
-CHART_H = 260  # C12: read for shape, not level -> 240px+
+if "view" not in st.session_state:
+    st.session_state.view = "home"
 
-st.set_page_config(page_title="Data Guild — Buyers", layout="wide")
-
-st.markdown(
-    """
-    <style>
-      .ui-h1{font-size:1.45rem;font-weight:600;color:#111827;margin:0 0 14px 0}
-      .ui-scope{font-size:0.85rem;color:#6B7280;margin:0 0 6px 0}
-      /* C34: tight inside a block, generous between blocks */
-      [data-testid="stVerticalBlock"]{gap:0.3rem !important}
-      /* L7 / C31: the section title IS the disclosure control, not a bordered card */
-      [data-testid="stExpander"]{border:0 !important;background:none !important;
-        margin-top:18px;margin-bottom:0 !important}
-      [data-testid="stExpander"] details{background:none !important;border:0 !important}
-      /* Streamlit animates the open/close with an explicit height + overflow:hidden.
-         When that animation does not run the content stays clipped to the summary,
-         so pin an open expander to its content height. */
-      [data-testid="stExpander"] details[open]{height:auto !important;overflow:visible !important}
-      [data-testid="stExpander"] summary{padding:0 !important}
-      [data-testid="stExpander"] summary p{font-size:0.82rem;font-weight:600;color:#111827}
-    </style>
-    """,
-    unsafe_allow_html=True,
-)
+WINDOWS = {"Last 30 days": 30, "Last 90 days": 90, "Last year": 365}
 
 
-@st.cache_resource
-def get_bigquery_client() -> bigquery.Client:
-    credentials = service_account.Credentials.from_service_account_info(
-        st.secrets["gcp_service_account"]
-    )
-    return bigquery.Client(credentials=credentials, project=PROJECT_ID)
+def fmt_money(v: float) -> str:
+    """Unit chosen so a real value never prints as zero (B17)."""
+    if abs(v) >= 1_000_000:
+        return f"${v / 1_000_000:,.2f}M"
+    if abs(v) >= 1_000:
+        return f"${v / 1_000:,.0f}K"
+    return f"${v:,.0f}"
 
 
-# A buyer = a distinct user with a SUCCEEDED payment that is an actual purchase.
-#   status = 'succeeded'                     -> 14.9% of payment rows are not succeeded
-#   payment_type NOT IN (refund, chargeback) -> those are stored as POSITIVE rows in this
-#                                               dataset, so they would otherwise count as buys
-# Window is anchored to MAX(occurred_at), never CURRENT_DATE(): the data stops 2026-06-17.
-SQL = f"""
-WITH mx AS (
-  SELECT DATE(MAX(occurred_at)) AS max_d
-  FROM `{PROJECT_ID}.{DATASET}.payment`
-), purch AS (
-  SELECT DATE(occurred_at) AS d, user_id
-  FROM `{PROJECT_ID}.{DATASET}.payment`
-  WHERE DATE(occurred_at) BETWEEN (SELECT DATE_SUB(max_d, INTERVAL 29 DAY) FROM mx)
-                              AND (SELECT max_d FROM mx)
-    AND status = 'succeeded'
-    AND payment_type NOT IN ('refund', 'chargeback')
-), daily AS (
-  SELECT d, COUNT(DISTINCT user_id) AS buyers FROM purch GROUP BY d
-), tot AS (
-  -- Deliberately NOT the sum of `buyers`: a user active on several days would be
-  -- counted once per day. Summing the daily column overstates by ~12% here.
-  SELECT COUNT(DISTINCT user_id) AS window_buyers FROM purch
-)
-SELECT daily.d AS day, daily.buyers, tot.window_buyers
-FROM daily CROSS JOIN tot
-ORDER BY day
-"""
-
-
-@st.cache_data(ttl=3600)
-def load_buyers() -> pd.DataFrame:
-    df = get_bigquery_client().query(SQL).to_dataframe()
-    # BigQuery DATE arrives as db_dtypes.dbdate, which has no datetime methods.
-    df["day"] = pd.to_datetime(df["day"])
-    return df
-
-
-df = load_buyers()
-
-window_buyers = int(df["window_buyers"].iloc[0])
-d_from, d_to = df["day"].min(), df["day"].max()
-
-st.markdown('<div class="ui-h1">Buyers</div>', unsafe_allow_html=True)
-st.markdown(
-    f'<div class="ui-scope">{d_from:%d %b %Y} – {d_to:%d %b %Y} · '
-    f"{window_buyers:,} unique buyers</div>",
-    unsafe_allow_html=True,
-)
-
-with st.expander("Daily buyers", expanded=False):
+def masthead() -> None:
     st.markdown(
-        f"""
-**Buyer** — a distinct `user_id` with a `succeeded` payment that is not a `refund` or
-`chargeback`. Both filters are load-bearing: 14.9% of payment rows are not `succeeded`,
-and this dataset stores refunds and chargebacks as *positive* rows.
+        '<div class="dg-top"><span class="dg-mark">DG</span>'
+        '<span class="dg-tag">Data Guild &nbsp;·&nbsp; analytics, in-house</span></div>',
+        unsafe_allow_html=True,
+    )
 
-**Three different counts sit behind this window**, and only the first answers "how many buyers":
+
+def completeness(d0, d1) -> None:
+    st.markdown(
+        f'<div class="dg-complete">Complete through <b>{d1:%d %B %Y}</b>. '
+        f"This dataset ends there — every window below is measured back from it, "
+        f"not from today.</div>",
+        unsafe_allow_html=True,
+    )
+
+
+# ----------------------------------------------------------------- home
+def home() -> None:
+    masthead()
+    st.markdown('<div class="dg-h1">Welcome</div>', unsafe_allow_html=True)
+
+    st.markdown('<div class="dg-fl">Window</div>', unsafe_allow_html=True)
+    label = st.radio("Window", list(WINDOWS), horizontal=True,
+                     label_visibility="collapsed")
+    days = WINDOWS[label]
+
+    t = data.totals(days)
+    d = data.daily(days)
+    completeness(t["d0"], t["d1"])
+
+    c1, c2, c3, c4 = st.columns(4, gap="small")
+
+    with c1:
+        st.markdown(th.tile(
+            "Buyers", f"{t['buyers']:,}",
+            f"unique · {days}d",
+            th.spark(data.series(d, "buyers")["value"].tolist()),
+        ), unsafe_allow_html=True)
+
+    with c2:
+        st.markdown(th.tile(
+            "Net revenue", fmt_money(t["net_revenue"]),
+            "recognised less refunds",
+            th.spark(data.series(d, "net_revenue")["value"].tolist()),
+        ), unsafe_allow_html=True)
+
+    with c3:
+        st.markdown(th.tile(
+            "New subscriptions", f"{t['new_subs']:,}",
+            f"started in window",
+            th.spark(data.series(d, "new_subs")["value"].tolist()),
+        ), unsafe_allow_html=True)
+
+    with c4:
+        # More is worse -> red (house rule), and a rate always shows its denominator (B1).
+        rr = t["refund_rate"]
+        st.markdown(th.tile(
+            "Refund rate",
+            f"{rr * 100:,.1f}%" if rr is not None else "–",
+            (f"{fmt_money(t['refunds'])} of {fmt_money(t['gross_revenue'])} gross"
+             if rr is not None else "gross revenue not positive"),
+            value_color=th.BAD,
+        ), unsafe_allow_html=True)
+
+    with st.expander("What these four measure", expanded=False):
+        st.markdown(f"""
+**Buyers** — distinct users with a `succeeded` payment that is not a refund or chargeback.
+Cannot be summed from the daily sparkline: a user buying on two days is one buyer.
+
+**Net revenue** — `recognized_amount_usd` **plus** `refund_adjustment_usd`, which is stored
+negative. Note `payment` uses the opposite convention, storing refunds as positive rows.
+
+**New subscriptions** — rows in `subscription` started inside the window. Subscriptions, not
+subscribers: {t['new_subs']:,} started, from fewer distinct users.
+
+**Refund rate** — refunds ÷ gross recognised revenue, computed inside the window rather than
+scaled from a total. Blank rather than shown if gross revenue is not positive.
+
+**No period-over-period deltas anywhere on this page.** Buyers grow in every one of the 36
+months on record, from 11 in Jun 2023 to 17,562 in May 2026 — so any "vs last period" figure
+here would report the data generator, not performance. This is generated demo data.
+
+**Not shown, deliberately:** credit-refund rate and affiliate conversion both split ~50/50,
+which is a random generator rather than behaviour. Active MRR is a snapshot that would ignore
+the window control above. Trial→paid conversion is biased down, because trials starting near
+the window's end have not had time to convert.
+""")
+
+    st.markdown('<div class="dg-sec">Dashboards</div>', unsafe_allow_html=True)
+    n1, n2, n3 = st.columns(3, gap="small")
+    with n1:
+        if st.button("Buyers  ›", key="nav_buyers", use_container_width=True):
+            st.session_state.view = "buyers"
+            st.rerun()
+    with n2:
+        st.markdown('<div class="dg-card" style="min-height:62px"><div class="dg-k">&nbsp;</div>'
+                    '<div class="dg-sub">next dashboard — not built</div></div>',
+                    unsafe_allow_html=True)
+    with n3:
+        st.markdown('<div class="dg-card" style="min-height:62px"><div class="dg-k">&nbsp;</div>'
+                    '<div class="dg-sub">next dashboard — not built</div></div>',
+                    unsafe_allow_html=True)
+
+
+# --------------------------------------------------------------- buyers
+def buyers() -> None:
+    masthead()
+    if st.button("‹  Back", key="nav_home"):
+        st.session_state.view = "home"
+        st.rerun()
+
+    days = 30
+    t = data.totals(days)
+    s = data.series(data.daily(days), "buyers")
+
+    st.markdown('<div class="dg-h1">Buyers</div>', unsafe_allow_html=True)
+    st.markdown(
+        f'<div class="dg-complete">{t["d0"]:%d %b %Y} – {t["d1"]:%d %b %Y} &nbsp;·&nbsp; '
+        f'<b>{t["buyers"]:,}</b> unique buyers &nbsp;·&nbsp; '
+        f"y-axis does not start at zero</div>",
+        unsafe_allow_html=True,
+    )
+
+    axis_x = alt.Axis(format="%d %b", labelFontSize=13, grid=False,
+                      labelColor=th.MUTED, tickColor=th.GRID, domainColor=th.GRID)
+    axis_y = alt.Axis(labelFontSize=13, labelColor=th.MUTED, gridColor=th.GRID,
+                      domain=False, ticks=False)
+
+    line = alt.Chart(s).mark_line(
+        strokeWidth=2, color=th.ACCENT, interpolate="linear"   # C36: no smoothing
+    ).encode(
+        x=alt.X("d:T", title=None, axis=axis_x),
+        y=alt.Y("value:Q", title=None, axis=axis_y,
+                scale=alt.Scale(zero=False, nice=True)),       # B6: labelled above
+    )
+    dots = alt.Chart(s).mark_point(               # C22: countable periods
+        size=26, filled=True, color=th.ACCENT, opacity=1
+    ).encode(
+        x="d:T", y="value:Q",
+        tooltip=[                                  # C13: whitelist, no internal columns
+            alt.Tooltip("d:T", title="Day", format="%a %d %b %Y"),
+            alt.Tooltip("value:Q", title="Buyers", format=","),
+        ],
+    )
+
+    st.altair_chart(
+        (line + dots)
+        .properties(height=300, padding={"left": 0, "top": 6, "right": 16, "bottom": 0})
+        .configure_view(strokeWidth=0)
+        .configure(background=th.BG),
+        use_container_width=True,
+    )
+
+    with st.expander("Daily buyers", expanded=False):
+        st.markdown(f"""
+**Buyer** — a distinct `user_id` with a `succeeded` payment that is not a `refund` or
+`chargeback`.
 
 | | |
 |---|---|
-| unique buyers in the window | **{window_buyers:,}** |
-| sum of the daily values below | {int(df['buyers'].sum()):,} |
-| purchase transactions | 23,581 |
+| unique buyers in the window | **{t['buyers']:,}** |
+| sum of the daily values | {int(s['value'].sum()):,} |
 
-The daily values cannot be summed — a user buying on two days appears in both. Summing them
-overstates by {int(df['buyers'].sum()) - window_buyers:,} ({(df['buyers'].sum() / window_buyers - 1):.1%}).
+The daily values cannot be summed — a user buying on two days appears in both, overstating
+by {int(s['value'].sum()) - t['buyers']:,}.
 
-**The window is the last 30 days the data covers, not the last 30 days.** The dataset ends
-2026-06-17. Every day in the window is present and the final day runs to 23:59, so no period
-is partial.
+The rise is a property of this generated dataset, not a result: buyers grow in every one of
+the 36 months on record.
+""")
 
-**The rise is a property of the dataset, not a result.** Monthly buyers grow in every one of
-the 36 months on record, from 11 in Jun 2023 to 17,562 in May 2026. This is generated demo
-data with a built-in growth ramp.
-"""
-    )
 
-base = alt.Chart(df)
-
-line = base.mark_line(strokeWidth=2, color=BAR_BLUE, interpolate="linear").encode(
-    x=alt.X(
-        "day:T",
-        title=None,
-        axis=alt.Axis(format="%d %b", labelFontSize=13, grid=False,
-                      labelColor=MUTED, tickColor=GRID, domainColor=GRID),
-    ),
-    y=alt.Y(
-        "buyers:Q",
-        title=None,
-        scale=alt.Scale(domainMin=0, nice=True),
-        axis=alt.Axis(labelFontSize=13, labelColor=MUTED, gridColor=GRID,
-                      domain=False, ticks=False),
-    ),
-)
-
-# C22: mark every point so the reader can count the periods.
-dots = base.mark_point(size=26, filled=True, color=BAR_BLUE, opacity=1).encode(
-    x="day:T", y="buyers:Q",
-    tooltip=[  # C13: whitelist. No internal columns.
-        alt.Tooltip("day:T", title="Day", format="%a %d %b %Y"),
-        alt.Tooltip("buyers:Q", title="Buyers", format=","),
-    ],
-)
-
-# The final value, labelled. Not a legend and not identity (one series, named by the
-# title) -- it prints the most recent number, which is the thing most often read off.
-last = df.iloc[[-1]]
-last_label = alt.Chart(last).mark_text(
-    align="left", dx=8, dy=0, fontSize=13, fontWeight=600, color=BAR_BLUE
-).encode(x="day:T", y="buyers:Q", text=alt.Text("buyers:Q", format=","))
-
-st.altair_chart(
-    (line + dots + last_label)
-    .properties(height=CHART_H, padding={"left": 0, "top": 6, "right": 46, "bottom": 0})
-    .configure_view(strokeWidth=0)          # C30: chrome recessive
-    .configure_axis(labelFont="sans-serif"),
-    use_container_width=True,
-)
+{"home": home, "buyers": buyers}[st.session_state.view]()
