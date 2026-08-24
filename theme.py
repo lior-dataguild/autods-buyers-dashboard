@@ -47,14 +47,16 @@ def css() -> str:
               letter-spacing:.16em; color:{ACCENT}; line-height:1;
               display:inline-block; }}
 
-  .dg-h1 {{ font-size:27px; font-weight:600; color:{TEXT}; margin:0 0 7px; }}
+  .dg-h1 {{ font-size:27px; font-weight:600; color:{TEXT};
+            margin:0 0 4px; padding-bottom:16px; }}
   .dg-complete {{ font-family:{MONO}; font-size:12px; color:{MUTED}; margin:0 0 22px; }}
   .dg-complete b {{ color:#A8B6C4; font-weight:600; }}
 
   .dg-sec {{ font-size:10px; letter-spacing:.13em; text-transform:uppercase;
-             color:{ACCENT}; font-weight:700; margin:26px 0 11px; }}
+             color:{ACCENT}; font-weight:700; margin:28px 0 0;
+             padding-bottom:14px; }}
   .dg-fl {{ font-size:10px; letter-spacing:.1em; text-transform:uppercase;
-            color:{DIM}; margin:0 0 7px; }}
+            color:{DIM}; margin:0; padding-bottom:18px; }}
   .dg-rule {{ height:1px; background:{BORDER_SOFT}; margin:22px 0 20px; }}
   .dg-blank {{ font-size:16px; font-weight:600; color:#3A4653; }}
 
@@ -70,7 +72,7 @@ def css() -> str:
       letter-spacing:.16em; color:{ACCENT}; line-height:1;
       padding:0 14px 4px; display:block; }}
   .dg-navlabel {{ font-size:10px; letter-spacing:.13em; text-transform:uppercase;
-      color:{DIM}; padding:0 14px; margin:22px 0 8px; }}
+      color:{DIM}; padding:0 14px 22px; margin:24px 0 0; }}
   /* Nav items are buttons, so the active one can be rendered as its own element and
      styled without fighting a widget's internal state. */
   section[data-testid="stSidebar"] .stButton > button {{
@@ -91,7 +93,7 @@ def css() -> str:
   section[data-testid="stSidebar"] [data-testid="stExpander"] {{
       margin:0 !important; border:0 !important; }}
   section[data-testid="stSidebar"] [data-testid="stExpander"] summary {{
-      padding:7px 14px !important; }}
+      padding:8px 14px 11px !important; }}
   section[data-testid="stSidebar"] [data-testid="stExpander"] summary p {{
       font-size:10px !important; letter-spacing:.13em; text-transform:uppercase;
       font-weight:700 !important; color:{DIM} !important; }}
@@ -126,7 +128,7 @@ def css() -> str:
      one baseline across both rows. */
   .dg-dslot {{ min-height:19px; }}
   .dg-sparkslot {{ min-height:44px; }}
-  .dg-k {{ font-size:12px; color:{MUTED}; margin-bottom:7px; }}
+  .dg-k {{ font-size:12px; color:{MUTED}; margin:0; padding-bottom:11px; }}
   .dg-v {{ font-size:31px; font-weight:700; color:{TEXT}; letter-spacing:-.015em;
            line-height:1.08; }}
   .dg-d {{ font-size:11.5px; margin-top:6px; font-weight:600; }}
@@ -168,7 +170,8 @@ def css() -> str:
       color:{ACCENT} !important; font-weight:600 !important; }}
 
   /* --- ask the data --- */
-  .dg-ask {{ font-size:15px; font-weight:600; color:{TEXT}; margin:0 0 9px; }}
+  .dg-ask {{ font-size:15px; font-weight:600; color:{TEXT};
+             margin:0; padding-bottom:19px; }}
   [data-testid="stTextInput"] input {{
       background:{PANEL} !important; border:1px solid #1E2833 !important;
       border-radius:7px !important; color:{TEXT} !important;
