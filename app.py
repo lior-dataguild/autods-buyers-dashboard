@@ -83,6 +83,10 @@ with st.sidebar:
     st.markdown('<span class="dg-navlogo">DG</span>', unsafe_allow_html=True)
     st.markdown('<div class="dg-navlabel">Dashboards</div>', unsafe_allow_html=True)
     nav_item(HOME)
+    # Overview is a top-level item, not a group, so it needs its own separation from
+    # the first group title -- without this the GROWTH chevron collides with the
+    # bottom edge of Overview's highlight block.
+    st.markdown('<div class="dg-navgap"></div>', unsafe_allow_html=True)
     for group, items in GROUPS.items():
         # The group holding the current page opens itself, so the nav always shows
         # where you are without needing to remember which group it was in.
@@ -101,10 +105,14 @@ st.markdown(f'<div class="dg-h1">{GREETING if page == HOME else page}</div>',
 # ------------------------------------------------------------- filters
 days, channel, t, d = None, data.ALL, None, None
 if page in FILTERED:
-    # One line. Sizing the columns to the measured chip widths (296px / 780px) made
-    # both rows wrap -- the wrap threshold sits right at those numbers, so an exact fit
-    # is not a fit. These weights give each row clear headroom instead; the small
-    # remaining gap after Date range beats either row breaking in two.
+    # The completeness line sits ABOVE the filters but reports the window the filters
+    # choose, so its position is reserved here and filled once they have been read.
+    line_slot = st.empty()
+
+    # One line, packed left. Two columns only: adding a spacer column costs another
+    # gap and renormalises the weights, which shrank BOTH filter columns instead of
+    # absorbing the remainder. Measured needs are 276px and 725px; this split leaves
+    # each comfortably clear, because an exact fit is not a fit.
     f1, f2 = st.columns([1, 2.9], gap="small")
     with f1:
         st.markdown('<div class="dg-fl">Date range</div>', unsafe_allow_html=True)
@@ -119,10 +127,11 @@ if page in FILTERED:
     t = data.totals(days, channel)
     d = data.daily(days, channel)
 
-    st.markdown(
-        f'<div class="dg-complete">Complete through <b>{t["d1"]:%d %B %Y}</b>. Today is '
-        f"excluded — this dataset ends there, so every window is measured back from it. "
-        f'Prior period: {t["p0"]:%d %b} – {t["p1"]:%d %b %Y}.</div>',
+    # Short form. The reason windows run back from the data's last day rather than from
+    # today is stated in the info disclosure below, so it is not lost by trimming here.
+    line_slot.markdown(
+        f'<div class="dg-complete">Data ends <b>{t["d1"]:%d %b %Y}</b>'
+        f'&nbsp; · &nbsp;prior period {t["p0"]:%d %b} – {t["p1"]:%d %b %Y}</div>',
         unsafe_allow_html=True,
     )
     st.markdown('<div class="dg-rule"></div>', unsafe_allow_html=True)

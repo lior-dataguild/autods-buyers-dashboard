@@ -49,7 +49,8 @@ def css() -> str:
 
   .dg-h1 {{ font-size:27px; font-weight:600; color:{TEXT};
             margin:0 0 4px; padding-bottom:16px; }}
-  .dg-complete {{ font-family:{MONO}; font-size:12px; color:{MUTED}; margin:0 0 22px; }}
+  .dg-complete {{ font-family:{MONO}; font-size:12px; color:{MUTED};
+                 margin:0; padding-bottom:20px; }}
   .dg-complete b {{ color:#A8B6C4; font-weight:600; }}
 
   .dg-sec {{ font-size:10px; letter-spacing:.13em; text-transform:uppercase;
@@ -59,6 +60,7 @@ def css() -> str:
             color:{DIM}; margin:0; padding-bottom:18px; }}
   .dg-rule {{ height:1px; background:{BORDER_SOFT}; margin:22px 0 20px; }}
   .dg-blank {{ font-size:16px; font-weight:600; color:#3A4653; }}
+  .dg-navgap {{ height:4px; }}
 
   /* --- sidebar navigation -------------------------------------------------
      Scoped by ancestor, so the main page's chip rules cannot leak in and the
@@ -91,7 +93,7 @@ def css() -> str:
   /* Group headers: tap to open. Collapsed by default so the whole suite is not on
      screen at once. */
   section[data-testid="stSidebar"] [data-testid="stExpander"] {{
-      margin:0 !important; border:0 !important; }}
+      margin:22px 0 0 !important; border:0 !important; }}
   section[data-testid="stSidebar"] [data-testid="stExpander"] summary {{
       padding:8px 14px 11px !important; }}
   section[data-testid="stSidebar"] [data-testid="stExpander"] summary p {{
@@ -138,9 +140,9 @@ def css() -> str:
   .dg-spark {{ display:block; margin-top:10px; }}
 
   /* --- filter chips: a real control, it moves every tile --- */
-  div[role="radiogroup"] {{ gap:7px !important; }}
+  div[role="radiogroup"] {{ gap:6px !important; }}
   div[role="radiogroup"] label {{
-      border:1px solid {CHIP_EDGE}; border-radius:99px; padding:5px 14px;
+      border:1px solid {CHIP_EDGE}; border-radius:99px; padding:5px 11px;
       background:transparent; font-size:12px; margin:0 !important; }}
   /* Hide the selection dot. It says nothing the border and text colour do not already
      say, and it costs a third of the chip's width. Streamlit's class rules outrank a
