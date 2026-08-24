@@ -22,11 +22,18 @@ QUESTIONS = [
 
 HOME = "Overview"
 BUYERS = "Buyers"
-# Everything past Buyers is a placeholder name, not a commitment to what it will
-# measure. Add a dashboard by adding it here and giving it a branch below.
-PLANNED = ["Revenue & recognition", "Trials & conversion", "Subscriptions & churn",
-           "Support load", "Affiliates"]
-NAV = [HOME, BUYERS] + PLANNED
+GREETING = "Hello Michael"   # hardcoded: Community Cloud cannot tell us who is viewing
+
+# Dashboards, grouped. Groups collapse so the whole suite is not on screen at once;
+# the group holding the current page opens itself.
+# Everything except Overview and Buyers is a placeholder name, not a commitment to what
+# it will measure. Add a dashboard by putting it in a group and giving it a branch below.
+GROUPS = {
+    "Growth": [BUYERS, "Trials & conversion"],
+    "Revenue": ["Revenue & recognition", "Subscriptions & churn"],
+    "Operations": ["Support load", "Affiliates"],
+}
+NAV = [HOME] + [item for items in GROUPS.values() for item in items]
 
 # Pages that actually consume the filters. A filter shown on a page it cannot move is
 # worse than no filter, so the placeholders do not get one.
@@ -53,31 +60,56 @@ def ratio(v) -> str:
 
 
 # ------------------------------------------------------------------ nav
+st.session_state.setdefault("page", HOME)
+page = st.session_state.page
+
+
+def nav_item(name: str) -> None:
+    """The active item renders as its own element rather than a button, so its state is
+    explicit instead of inferred from a widget's internals."""
+    if name == page:
+        st.markdown(f'<div class="dg-navactive">{name}</div>', unsafe_allow_html=True)
+    elif st.button(name, key=f"nav_{name}"):
+        st.session_state.page = name
+        st.rerun()
+
+
 with st.sidebar:
     st.markdown('<span class="dg-navlogo">DG</span>', unsafe_allow_html=True)
     st.markdown('<div class="dg-navlabel">Dashboards</div>', unsafe_allow_html=True)
-    page = st.radio("Dashboards", NAV, label_visibility="collapsed")
+    nav_item(HOME)
+    for group, items in GROUPS.items():
+        # The group holding the current page opens itself, so the nav always shows
+        # where you are without needing to remember which group it was in.
+        with st.expander(group, expanded=page in items):
+            for item in items:
+                nav_item(item)
     st.markdown(
         '<div class="dg-navlabel" style="margin-top:26px">Data</div>'
         f'<div class="dg-soon">{data.DATASET}</div>',
         unsafe_allow_html=True,
     )
 
-st.markdown(f'<div class="dg-h1">{page}</div>', unsafe_allow_html=True)
+st.markdown(f'<div class="dg-h1">{GREETING if page == HOME else page}</div>',
+            unsafe_allow_html=True)
 
 # ------------------------------------------------------------- filters
 days, channel, t, d = None, data.ALL, None, None
 if page in FILTERED:
-    # Stacked rather than side-by-side: both rows start at the same left edge, so the
-    # eye drops straight down the labels instead of jumping across a gutter.
-    st.markdown('<div class="dg-fl">Date range</div>', unsafe_allow_html=True)
-    wlabel = st.radio("Date range", list(WINDOWS), horizontal=True,
-                      label_visibility="collapsed")
-    st.markdown('<div class="dg-fl" style="margin-top:14px">Source</div>',
-                unsafe_allow_html=True)
-    channel = st.radio("Source", SOURCES, horizontal=True,
-                       label_visibility="collapsed",
-                       format_func=lambda s: s.replace("_", " "))
+    # One line. Sizing the columns to the measured chip widths (296px / 780px) made
+    # both rows wrap -- the wrap threshold sits right at those numbers, so an exact fit
+    # is not a fit. These weights give each row clear headroom instead; the small
+    # remaining gap after Date range beats either row breaking in two.
+    f1, f2 = st.columns([1, 2.9], gap="small")
+    with f1:
+        st.markdown('<div class="dg-fl">Date range</div>', unsafe_allow_html=True)
+        wlabel = st.radio("Date range", list(WINDOWS), horizontal=True,
+                          label_visibility="collapsed")
+    with f2:
+        st.markdown('<div class="dg-fl">Source</div>', unsafe_allow_html=True)
+        channel = st.radio("Source", SOURCES, horizontal=True,
+                           label_visibility="collapsed",
+                           format_func=lambda s: s.replace("_", " "))
     days = WINDOWS[wlabel]
     t = data.totals(days, channel)
     d = data.daily(days, channel)

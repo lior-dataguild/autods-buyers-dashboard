@@ -71,21 +71,36 @@ def css() -> str:
       padding:0 12px 4px; display:block; }}
   .dg-navlabel {{ font-size:10px; letter-spacing:.13em; text-transform:uppercase;
       color:{DIM}; padding:0 12px; margin:20px 0 8px; }}
-  section[data-testid="stSidebar"] div[role="radiogroup"] {{
-      gap:1px !important; flex-direction:column !important; }}
-  section[data-testid="stSidebar"] div[role="radiogroup"] label {{
+  /* Nav items are buttons, so the active one can be rendered as its own element and
+     styled without fighting a widget's internal state. */
+  section[data-testid="stSidebar"] .stButton > button {{
+      width:100% !important; text-align:left !important;
       border:0 !important; border-left:2px solid transparent !important;
-      border-radius:0 !important; padding:9px 12px !important;
-      width:100% !important; background:transparent !important; }}
-  section[data-testid="stSidebar"] div[role="radiogroup"] label p {{
-      color:{CHIP_TEXT} !important; font-size:13px !important;
-      font-weight:400 !important; }}
-  section[data-testid="stSidebar"] div[role="radiogroup"] label:hover {{
-      background:rgba(255,255,255,.03) !important; }}
-  section[data-testid="stSidebar"] div[role="radiogroup"] label:has(input:checked) {{
-      border-left-color:{ACCENT} !important; background:rgba(34,211,238,.09) !important; }}
-  section[data-testid="stSidebar"] div[role="radiogroup"] label:has(input:checked) p {{
-      color:{ACCENT} !important; font-weight:600 !important; }}
+      border-radius:0 !important; padding:8px 12px 8px 14px !important;
+      background:transparent !important; color:{CHIP_TEXT} !important;
+      font-size:13px !important; font-weight:400 !important; min-height:0 !important;
+      justify-content:flex-start !important; }}
+  section[data-testid="stSidebar"] .stButton > button:hover {{
+      background:rgba(255,255,255,.04) !important; color:{TEXT} !important;
+      border-left-color:{CHIP_EDGE_HOVER} !important; }}
+  .dg-navactive {{ border-left:2px solid {ACCENT}; background:rgba(34,211,238,.09);
+      padding:8px 12px 8px 14px; font-size:13px; font-weight:600; color:{ACCENT}; }}
+
+  /* Group headers: tap to open. Collapsed by default so the whole suite is not on
+     screen at once. */
+  section[data-testid="stSidebar"] [data-testid="stExpander"] {{
+      margin:0 !important; border:0 !important; }}
+  section[data-testid="stSidebar"] [data-testid="stExpander"] summary {{
+      padding:7px 12px !important; }}
+  section[data-testid="stSidebar"] [data-testid="stExpander"] summary p {{
+      font-size:10px !important; letter-spacing:.13em; text-transform:uppercase;
+      font-weight:700 !important; color:{DIM} !important; }}
+  section[data-testid="stSidebar"] [data-testid="stExpander"] summary:hover p {{
+      color:{CHIP_TEXT} !important; }}
+  section[data-testid="stSidebar"] [data-testid="stExpander"] details > div {{
+      padding:0 !important; }}
+  section[data-testid="stSidebar"] [data-testid="stVerticalBlock"] {{
+      gap:0 !important; }}
   .dg-soon {{ font-size:11px; color:{DIM}; padding:0 12px; margin-top:3px; }}
 
   /* Bottom dashboard tabs */
