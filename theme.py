@@ -83,18 +83,23 @@ def css() -> str:
   div[role="radiogroup"] label {{
       border:1px solid {CHIP_EDGE}; border-radius:99px; padding:5px 14px;
       background:transparent; font-size:12px; margin:0 !important; }}
-  /* The dot carries nothing the border and text colour do not already say, and it
-     costs a third of the chip's width. Streamlit's own class rules are more specific
-     than a bare selector, hence !important. Several selectors on purpose: the checked
-     state has been rendered with a different inner structure than the unchecked one,
-     so matching only one shape leaves a dot behind on the selected chip. */
-  div[role="radiogroup"] label > div:first-child,
-  div[role="radiogroup"] label > div:first-of-type,
-  div[role="radiogroup"] label [data-baseweb="radio"],
-  div[role="radiogroup"] label [role="radio"],
-  div[role="radiogroup"] label svg,
-  div[role="radiogroup"] label input,
-  div[role="radiogroup"] label input[type="radio"] {{ display:none !important; }}
+  /* Hide the selection dot. It says nothing the border and text colour do not already
+     say, and it costs a third of the chip's width. Streamlit's class rules outrank a
+     bare selector, hence !important.
+     Every rule here is guarded with :not(:has(p)) so it can only ever match a box that
+     does NOT contain the chip's text. An earlier version matched [data-baseweb="radio"]
+     outright, which is harmless on the Streamlit build in this venv but wraps the whole
+     chip -- text included -- on the newer build Cloud runs, and blanked every chip
+     there. Never hide a container by structure alone when a text-bearing one can take
+     the same shape. */
+  div[role="radiogroup"] label > div:first-child:not(:has(p)) {{ display:none !important; }}
+  div[role="radiogroup"] label input {{ display:none !important; }}
+  /* Fallback for a nested structure where the dot is not a direct child: strip its
+     paint rather than its box. Harmless if it lands on a wrapper that was never
+     painted, and it can never blank the label. */
+  div[role="radiogroup"] label div:not(:has(p)) {{
+      background:transparent !important; box-shadow:none !important;
+      border-color:transparent !important; }}
   /* The <p> carries its own colour, so setting it on the label does nothing. */
   div[role="radiogroup"] label p {{
       font-size:12px !important; color:{CHIP_TEXT} !important; }}
