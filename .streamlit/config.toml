@@ -1,0 +1,16 @@
+# Without this block Streamlit renders its LIGHT theme -- widget text came out at
+# #31333F on our near-black background, which is unreadable, and the radio dot used
+# Streamlit's default red primary. Theming here fixes it at the source instead of
+# fighting each widget with a CSS override.
+[theme]
+base = "dark"
+primaryColor = "#22D3EE"            # the single accent, matches theme.ACCENT
+backgroundColor = "#0B0F14"         # theme.BG
+secondaryBackgroundColor = "#0E141B"  # theme.PANEL
+textColor = "#E6EDF3"               # theme.TEXT
+
+[server]
+headless = true
+
+[browser]
+gatherUsageStats = false

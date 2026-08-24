@@ -16,9 +16,15 @@ ACCENT = "#22D3EE"     # the one accent; carries the data
 GOOD = "#34D399"       # a movement in the good direction, per metric
 BAD = "#F87171"        # a movement in the bad direction, per metric
 TEXT = "#E6EDF3"
-MUTED = "#7D8A99"
-DIM = "#5B6B7C"
+MUTED = "#93A1B0"      # lifted from #7D8A99 -- body text was too dim on this ground
+DIM = "#6B7A8A"        # lifted from #5B6B7C -- sublabels were barely legible
 GRID = "#18202A"
+
+# Filter chips need more contrast than ordinary muted text: they are controls, and an
+# unreadable control is worse than an ugly one.
+CHIP_TEXT = "#B6C2CF"
+CHIP_EDGE = "#2A3542"
+CHIP_EDGE_HOVER = "#3D4B5C"
 
 MONO = 'ui-monospace,"SF Mono",Menlo,monospace'
 
@@ -70,15 +76,25 @@ def css() -> str:
   .dg-sub {{ font-family:{MONO}; font-size:11px; color:{DIM}; margin-top:5px; }}
   .dg-spark {{ display:block; margin-top:10px; }}
 
-  /* --- window chips: a real control, it moves every tile --- */
+  /* --- filter chips: a real control, it moves every tile --- */
   div[role="radiogroup"] {{ gap:7px !important; }}
   div[role="radiogroup"] label {{
-      border:1px solid {BORDER}; border-radius:99px; padding:4px 13px;
-      background:transparent; color:{MUTED}; font-size:12px; margin:0 !important; }}
+      border:1px solid {CHIP_EDGE}; border-radius:99px; padding:5px 14px;
+      background:transparent; font-size:12px; margin:0 !important; }}
+  /* The dot carries nothing the border and text colour do not already say, and it
+     costs a third of the chip's width. Streamlit's own class rules are more specific
+     than a bare selector, hence !important. */
+  div[role="radiogroup"] label > div:first-child {{ display:none !important; }}
+  div[role="radiogroup"] label input {{ display:none !important; }}
+  /* The <p> carries its own colour, so setting it on the label does nothing. */
+  div[role="radiogroup"] label p {{
+      font-size:12px !important; color:{CHIP_TEXT} !important; }}
+  div[role="radiogroup"] label:hover {{ border-color:{CHIP_EDGE_HOVER}; }}
+  div[role="radiogroup"] label:hover p {{ color:{TEXT} !important; }}
   div[role="radiogroup"] label:has(input:checked) {{
-      border-color:{ACCENT}; color:{ACCENT}; background:rgba(34,211,238,.07); }}
-  div[role="radiogroup"] label > div:first-child {{ display:none; }}
-  div[role="radiogroup"] label p {{ font-size:12px !important; }}
+      border-color:{ACCENT}; background:rgba(34,211,238,.10); }}
+  div[role="radiogroup"] label:has(input:checked) p {{
+      color:{ACCENT} !important; font-weight:600 !important; }}
 
   /* --- ask the data --- */
   .dg-ask {{ font-size:15px; font-weight:600; color:{TEXT}; margin:0 0 9px; }}
