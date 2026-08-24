@@ -129,7 +129,7 @@ if page in DATE_FILTERED:
     # (first 4 source). 30 / 40 / 30 lands ~327px and ~436px, which holds 3 date chips
     # on one row and exactly 4 source chips -- a 5th needs 511px and wraps. The third
     # column is a spacer; without it the first two stretch and a 5th chip fits.
-    f1, f2, _pad = st.columns([300, 400, 300], gap="large")
+    f1, f2, _pad = st.columns([240, 330, 430], gap="large")
     with f1:
         st.markdown('<div class="dg-fl">Date range</div>', unsafe_allow_html=True)
         wlabel = st.radio("Date range", list(WINDOWS), horizontal=True,

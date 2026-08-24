@@ -185,8 +185,13 @@ def css() -> str:
   /* No blanket max-width: the two groups need different widths (3 chips on one
      row vs 4 per row), so their COLUMNS govern where each wraps. One cap for
      both cannot express two different layouts. */
+  /* The box hugs its text. Padding was 8px 17px, so a 68px word sat in a 104px chip --
+     the border was 53% wider than the thing it enclosed.
+     The radius drops from 999px to 6px with it, and that is not a style change for its
+     own sake: a pill's radius is half its height, so at this padding the rounded end
+     curves back through the first and last letters. A tight box cannot also be a pill. */
   div[role="radiogroup"] label {{
-      border:1px solid {CHIP_EDGE}; border-radius:999px; padding:8px 17px;
+      border:1px solid {CHIP_EDGE}; border-radius:6px; padding:4px 8px;
       background:transparent; font-size:13px; margin:0 !important; }}
   /* Hide the selection dot. It says nothing the border and text colour do not already
      say, and it costs a third of the chip's width. Streamlit's class rules outrank a
