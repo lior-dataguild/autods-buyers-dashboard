@@ -68,15 +68,15 @@ def css() -> str:
   section[data-testid="stSidebar"] > div {{ padding-top:1.4rem; }}
   .dg-navlogo {{ font-family:{MONO}; font-size:24px; font-weight:700;
       letter-spacing:.16em; color:{ACCENT}; line-height:1;
-      padding:0 12px 4px; display:block; }}
+      padding:0 14px 4px; display:block; }}
   .dg-navlabel {{ font-size:10px; letter-spacing:.13em; text-transform:uppercase;
-      color:{DIM}; padding:0 12px; margin:20px 0 8px; }}
+      color:{DIM}; padding:0 14px; margin:22px 0 8px; }}
   /* Nav items are buttons, so the active one can be rendered as its own element and
      styled without fighting a widget's internal state. */
   section[data-testid="stSidebar"] .stButton > button {{
       width:100% !important; text-align:left !important;
       border:0 !important; border-left:2px solid transparent !important;
-      border-radius:0 !important; padding:8px 12px 8px 14px !important;
+      border-radius:0 !important; padding:8px 12px 8px 12px !important;
       background:transparent !important; color:{CHIP_TEXT} !important;
       font-size:13px !important; font-weight:400 !important; min-height:0 !important;
       justify-content:flex-start !important; }}
@@ -84,14 +84,14 @@ def css() -> str:
       background:rgba(255,255,255,.04) !important; color:{TEXT} !important;
       border-left-color:{CHIP_EDGE_HOVER} !important; }}
   .dg-navactive {{ border-left:2px solid {ACCENT}; background:rgba(34,211,238,.09);
-      padding:8px 12px 8px 14px; font-size:13px; font-weight:600; color:{ACCENT}; }}
+      padding:8px 12px 8px 12px; font-size:13px; font-weight:600; color:{ACCENT}; }}
 
   /* Group headers: tap to open. Collapsed by default so the whole suite is not on
      screen at once. */
   section[data-testid="stSidebar"] [data-testid="stExpander"] {{
       margin:0 !important; border:0 !important; }}
   section[data-testid="stSidebar"] [data-testid="stExpander"] summary {{
-      padding:7px 12px !important; }}
+      padding:7px 14px !important; }}
   section[data-testid="stSidebar"] [data-testid="stExpander"] summary p {{
       font-size:10px !important; letter-spacing:.13em; text-transform:uppercase;
       font-weight:700 !important; color:{DIM} !important; }}
@@ -101,7 +101,7 @@ def css() -> str:
       padding:0 !important; }}
   section[data-testid="stSidebar"] [data-testid="stVerticalBlock"] {{
       gap:0 !important; }}
-  .dg-soon {{ font-size:11px; color:{DIM}; padding:0 12px; margin-top:3px; }}
+  .dg-soon {{ font-size:11px; color:{DIM}; padding:0 14px; margin-top:3px; }}
 
   /* Bottom dashboard tabs */
   [data-testid="stTabs"] [data-baseweb="tab-list"] {{ gap:4px; border-bottom:1px solid {BORDER_SOFT}; }}
@@ -112,15 +112,27 @@ def css() -> str:
       color:{ACCENT} !important; background:{PANEL}; }}
   [data-testid="stTabs"] [data-baseweb="tab-highlight"] {{ background:{ACCENT}; }}
 
+  /* A panel is the same surface as a KPI card, for content that is not a metric --
+     so a chart and a tile read as the same kind of object. */
+  .dg-panel {{ border:1px solid {BORDER}; border-radius:7px; padding:17px 19px 19px;
+               background:{PANEL}; }}
+  .dg-ph {{ font-size:13px; color:{MUTED}; margin-top:7px; max-width:62ch;
+            line-height:1.55; }}
+
   /* --- KPI tile --- */
   .dg-card {{ border:1px solid {BORDER}; border-radius:7px; padding:15px 17px 13px;
               background:{PANEL}; height:100%; }}
+  /* Fixed-height slots so every card is the same height and the six sparklines sit on
+     one baseline across both rows. */
+  .dg-dslot {{ min-height:19px; }}
+  .dg-sparkslot {{ min-height:44px; }}
   .dg-k {{ font-size:12px; color:{MUTED}; margin-bottom:7px; }}
   .dg-v {{ font-size:31px; font-weight:700; color:{TEXT}; letter-spacing:-.015em;
            line-height:1.08; }}
   .dg-d {{ font-size:11.5px; margin-top:6px; font-weight:600; }}
   .dg-d span {{ color:{DIM}; font-weight:400; }}
-  .dg-sub {{ font-family:{MONO}; font-size:11px; color:{DIM}; margin-top:5px; }}
+  .dg-sub {{ font-family:{MONO}; font-size:11px; color:{DIM}; margin-top:5px;
+             min-height:15px; }}
   .dg-spark {{ display:block; margin-top:10px; }}
 
   /* --- filter chips: a real control, it moves every tile --- */
@@ -268,11 +280,15 @@ def delta(cur, pri, kind: str, up_is_good: bool, period_label: str) -> str:
 
 def kpi(label: str, value: str, delta_html: str = "", spark_html: str = "",
         sub: str = "") -> str:
-    sub_html = '<div class="dg-sub">%s</div>' % sub if sub else ""
+    # The sub slot is always emitted, even when empty. Rendering it conditionally made
+    # cards that carry a sublabel 23px taller than the ones that do not, so within a row
+    # the sparklines sat at different heights and the cards would not bottom-align.
     return (
         '<div class="dg-card">'
         '<div class="dg-k">%s</div>'
         '<div class="dg-v">%s</div>'
-        "%s%s%s"
-        "</div>" % (label, value, delta_html, spark_html, sub_html)
+        '<div class="dg-dslot">%s</div>'
+        '<div class="dg-sparkslot">%s</div>'
+        '<div class="dg-sub">%s</div>'
+        "</div>" % (label, value, delta_html, spark_html, sub or "&nbsp;")
     )

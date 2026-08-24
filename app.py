@@ -29,9 +29,14 @@ GREETING = "Hello Michael"   # hardcoded: Community Cloud cannot tell us who is 
 # Everything except Overview and Buyers is a placeholder name, not a commitment to what
 # it will measure. Add a dashboard by putting it in a group and giving it a branch below.
 GROUPS = {
-    "Growth": [BUYERS, "Trials & conversion"],
-    "Revenue": ["Revenue & recognition", "Subscriptions & churn"],
-    "Operations": ["Support load", "Affiliates"],
+    "Growth": [BUYERS, "Trials & conversion", "Acquisition channels",
+               "Cohort retention"],
+    "Revenue": ["Revenue & recognition", "MRR movements", "Subscriptions & churn",
+                "Pricing & plans"],
+    "Marketing": ["Campaign performance", "Channel efficiency", "Affiliates"],
+    "Product": ["Feature adoption", "Credit consumption", "Store connections"],
+    "Operations": ["Support load", "Refunds & chargebacks"],
+    "Finance": ["Unit economics", "Contribution margin"],
 }
 NAV = [HOME] + [item for items in GROUPS.values() for item in items]
 
@@ -258,12 +263,36 @@ by {int(d['customers'].sum()) - t['cur']['customers']:,}.
 """)
 
 
+# Which tables each planned dashboard would draw on. Every table named here exists in
+# the dataset -- the names are placeholders, but they are not pointing at nothing.
+BACKING = {
+    "Trials & conversion": "trial · subscription",
+    "Acquisition channels": "user · campaign_spend",
+    "Cohort retention": "user · subscription · payment",
+    "Revenue & recognition": "revenue_recognition",
+    "MRR movements": "subscription",
+    "Subscriptions & churn": "subscription",
+    "Pricing & plans": "plan · subscription",
+    "Campaign performance": "marketing_campaign · campaign_spend",
+    "Channel efficiency": "campaign_spend · revenue_recognition",
+    "Affiliates": "affiliate · affiliate_referral",
+    "Feature adoption": "credit_consumption_event",
+    "Credit consumption": "credit_consumption_event · credit_purchase",
+    "Store connections": "store_connection",
+    "Support load": "support_ticket",
+    "Refunds & chargebacks": "payment · revenue_recognition",
+    "Unit economics": "revenue_recognition · campaign_spend · support_ticket",
+    "Contribution margin": "revenue_recognition · campaign_spend · support_ticket",
+}
+
+
 def placeholder(name: str) -> None:
     st.markdown(
-        f'<div class="dg-card"><div class="dg-k">Not built</div>'
-        f'<div class="dg-sub">“{name}” is a placeholder in the navigation. The name is a '
-        "stand-in and does not commit to what this dashboard will measure — that gets "
-        "decided before anything is queried.</div></div>",
+        f'<div class="dg-panel"><div class="dg-k">Not built</div>'
+        f'<div class="dg-ph">“{name}” is a name in the navigation, not a commitment to '
+        "what it will measure — that gets decided with you before anything is queried."
+        f'</div><div class="dg-fl" style="margin:18px 0 5px">Would draw on</div>'
+        f'<div class="dg-sub">{BACKING.get(name, "—")}</div></div>',
         unsafe_allow_html=True,
     )
 
