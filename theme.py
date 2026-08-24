@@ -56,8 +56,10 @@ def css() -> str:
   .dg-sec {{ font-size:10px; letter-spacing:.13em; text-transform:uppercase;
              color:{ACCENT}; font-weight:700; margin:28px 0 0;
              padding-bottom:14px; }}
-  .dg-fl {{ font-size:10px; letter-spacing:.1em; text-transform:uppercase;
-            color:{DIM}; margin:0; padding-bottom:18px; }}
+  /* Reference styling: sentence case, readable size, bright -- a filter label is a
+     heading for a control, not a micro-caption. */
+  .dg-fl {{ font-size:14px; letter-spacing:0; text-transform:none;
+            color:{TEXT}; font-weight:400; margin:0; padding-bottom:14px; }}
   .dg-rule {{ height:1px; background:{BORDER_SOFT}; margin:22px 0 20px; }}
   .dg-blank {{ font-size:16px; font-weight:600; color:#3A4653; }}
   .dg-navgap {{ height:24px; }}
@@ -184,8 +186,8 @@ def css() -> str:
      row vs 4 per row), so their COLUMNS govern where each wraps. One cap for
      both cannot express two different layouts. */
   div[role="radiogroup"] label {{
-      border:1px solid {CHIP_EDGE}; border-radius:99px; padding:5px 11px;
-      background:transparent; font-size:12px; margin:0 !important; }}
+      border:1px solid {CHIP_EDGE}; border-radius:999px; padding:8px 17px;
+      background:transparent; font-size:13px; margin:0 !important; }}
   /* Hide the selection dot. It says nothing the border and text colour do not already
      say, and it costs a third of the chip's width. Streamlit's class rules outrank a
      bare selector, hence !important.
@@ -205,7 +207,7 @@ def css() -> str:
       border-color:transparent !important; }}
   /* The <p> carries its own colour, so setting it on the label does nothing. */
   div[role="radiogroup"] label p {{
-      font-size:12px !important; color:{CHIP_TEXT} !important;
+      font-size:13px !important; color:{TEXT} !important;
       margin:0 !important; padding:0 !important; }}
   /* The text wrapper reserved 8px to clear the radio dot. With the dot gone that is
      dead space inside the pill, so the label is no longer just its text. Guarded with
@@ -213,9 +215,11 @@ def css() -> str:
   div[role="radiogroup"] label > div:has(p) {{
       padding:0 !important; margin:0 !important; }}
   div[role="radiogroup"] label:hover {{ border-color:{CHIP_EDGE_HOVER}; }}
-  div[role="radiogroup"] label:hover p {{ color:{TEXT} !important; }}
+  div[role="radiogroup"] label:hover p {{ color:#FFFFFF !important; }}
+  /* Selected: accent ring and accent text over a barely-there tint, as in the
+     reference -- the ring and the text carry the state, not a filled pill. */
   div[role="radiogroup"] label:has(input:checked) {{
-      border-color:{ACCENT}; background:rgba(34,211,238,.10); }}
+      border-color:{ACCENT}; background:rgba(34,211,238,.06); }}
   div[role="radiogroup"] label:has(input:checked) p {{
       color:{ACCENT} !important; font-weight:600 !important; }}
 
