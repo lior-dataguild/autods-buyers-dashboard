@@ -22,6 +22,7 @@ QUESTIONS = [
 
 HOME = "Overview"
 BUYERS = "Buyers"
+PERF = "Performance"
 GREETING = "Hello Michael"   # hardcoded: Community Cloud cannot tell us who is viewing
 
 # Dashboards, grouped. Groups collapse so the whole suite is not on screen at once;
@@ -34,15 +35,17 @@ GROUPS = {
     "Revenue": ["Revenue & recognition", "MRR movements", "Subscriptions & churn",
                 "Pricing & plans"],
     "Marketing": ["Campaign performance", "Channel efficiency", "Affiliates"],
-    "Product": ["Feature adoption", "Credit consumption", "Store connections"],
+    "Product": [PERF, "Feature adoption", "Credit consumption", "Store connections"],
     "Operations": ["Support load", "Refunds & chargebacks"],
     "Finance": ["Unit economics", "Contribution margin"],
 }
 NAV = [HOME] + [item for items in GROUPS.values() for item in items]
 
-# Pages that actually consume the filters. A filter shown on a page it cannot move is
-# worse than no filter, so the placeholders do not get one.
-FILTERED = {HOME, BUYERS}
+# Which pages consume which control. A filter shown on a page it cannot move is worse
+# than no filter, so each control appears only where it does something. Performance is
+# split by product line, not by acquisition channel, so it takes the date range only.
+DATE_FILTERED = {HOME, BUYERS, PERF}
+SOURCE_FILTERED = {HOME, BUYERS}
 
 
 def money(v) -> str:
@@ -70,10 +73,16 @@ page = st.session_state.page
 
 
 def nav_item(name: str) -> None:
-    """The active item renders as its own element rather than a button, so its state is
-    explicit instead of inferred from a widget's internals."""
+    """Both states are the SAME widget, so their geometry cannot diverge.
+
+    The active row used to be a raw div: 37px tall inside a 21px container, against a
+    button's 42px in 42px. It overflowed its own container by 16px, which pushed into
+    the row below and made the list jump whenever the selection moved. A disabled
+    button is unclickable (correct -- it is the current page) and identical in box
+    model; only its colours differ, via CSS.
+    """
     if name == page:
-        st.markdown(f'<div class="dg-navactive">{name}</div>', unsafe_allow_html=True)
+        st.button(name, key=f"nav_{name}", disabled=True)
     elif st.button(name, key=f"nav_{name}"):
         st.session_state.page = name
         st.rerun()
@@ -104,7 +113,7 @@ st.markdown(f'<div class="dg-h1">{GREETING if page == HOME else page}</div>',
 
 # ------------------------------------------------------------- filters
 days, channel, t, d = None, data.ALL, None, None
-if page in FILTERED:
+if page in DATE_FILTERED:
     # The completeness line sits ABOVE the filters but reports the window the filters
     # choose, so its position is reserved here and filled once they have been read.
     line_slot = st.empty()
@@ -113,19 +122,25 @@ if page in FILTERED:
     # gap and renormalises the weights, which shrank BOTH filter columns instead of
     # absorbing the remainder. Measured needs are 276px and 725px; this split leaves
     # each comfortably clear, because an exact fit is not a fit.
-    f1, f2 = st.columns([1, 2.9], gap="small")
+    show_source = page in SOURCE_FILTERED
+    f1, f2 = st.columns([1, 3.4], gap="small")
     with f1:
         st.markdown('<div class="dg-fl">Date range</div>', unsafe_allow_html=True)
         wlabel = st.radio("Date range", list(WINDOWS), horizontal=True,
                           label_visibility="collapsed")
-    with f2:
-        st.markdown('<div class="dg-fl">Source</div>', unsafe_allow_html=True)
-        channel = st.radio("Source", SOURCES, horizontal=True,
-                           label_visibility="collapsed",
-                           format_func=lambda s: s.replace("_", " "))
+    if show_source:
+        with f2:
+            st.markdown('<div class="dg-fl">Source</div>', unsafe_allow_html=True)
+            channel = st.radio("Source", SOURCES, horizontal=True,
+                               label_visibility="collapsed",
+                               format_func=lambda s: s.replace("_", " "))
     days = WINDOWS[wlabel]
+    # totals() is fetched on every dated page, not just the source-filtered ones: the
+    # completeness line above needs the window's dates. With channel defaulting to ALL
+    # this is the same cache entry Overview uses, so it costs nothing extra.
     t = data.totals(days, channel)
-    d = data.daily(days, channel)
+    if page in SOURCE_FILTERED:
+        d = data.daily(days, channel)
 
     # The date is read from the data, never typed, so this line cannot go stale or
     # claim a completeness the dataset does not have.
@@ -166,7 +181,11 @@ def overview() -> None:
         ("Customers", f'{c["customers"]:,}', c["customers"], p["customers"],
          "level", True, "customers", ""),
     ]
-    for row in (spec[:3], spec[3:]):
+    for row_i, row in enumerate((spec[:3], spec[3:])):
+        if row_i:
+            # The two rows are separate column blocks; without this they sit ~5px apart
+            # and read as one dense grid rather than two rows of three.
+            st.markdown('<div class="dg-rowgap"></div>', unsafe_allow_html=True)
         for col, (lab, val, cv, pv, kind, good, dcol, sub) in zip(
                 st.columns(3, gap="small"), row):
             with col:
@@ -315,9 +334,67 @@ def placeholder(name: str) -> None:
     )
 
 
+def performance() -> None:
+    df = data.performance(days)
+    un = data.ad_spend_unattributed(days)
+
+    st.markdown(
+        th.rows_table(
+            df, "line",
+            [("Net revenue", "$M", "net", "m", False),
+             ("Refunds", "%", "refund_pct", "p1", True),
+             ("Ad spend", "$K", "ad_spend", "k", False),
+             ("MER", "", "mer", "r2", False),
+             ("CM", "%", "cm_pct", "p1", False),
+             ("Customers", "", "customers", "n0", False)],
+            "Product line"),
+        unsafe_allow_html=True,
+    )
+
+    st.markdown('<div class="dg-sec">Net revenue trend</div>', unsafe_allow_html=True)
+    for _, r in df.iterrows():
+        c1, c2 = st.columns([1, 4], gap="small")
+        with c1:
+            st.markdown(f'<div class="rt-lbl" style="padding-top:6px">{r["line"]}</div>',
+                        unsafe_allow_html=True)
+        with c2:
+            # Direction only, scaled to its own min/max (C21). Level is the job of the
+            # Net revenue bar above, which shares one scale across the three lines.
+            st.markdown(th.spark(r["net_trend"], w=520, h=34), unsafe_allow_html=True)
+
+    with st.expander("How this is measured", expanded=False):
+        st.markdown(f"""
+Rows are `product_line.category`, which has three distinct values.
+`product_line.name` has only two, so it cannot separate them.
+
+**Revenue needs no join.** `revenue_recognition` carries `product_line_id` directly, and
+it is populated on **all 250,000 rows** — no unattributed revenue.
+
+**Ad spend is a different story.** It reaches a product line only through
+`marketing_campaign.product_line_id`, and in this window
+**{money(un['unattributed'])} of {money(un['total'])} ({un['pct']:.1f}%)** sits on
+campaigns with no product line. That spend is **excluded** from every line rather than
+spread across them, so MER here is generous and CM % slightly optimistic. Neither number
+is comparable with the all-up MER on Overview, which does include it.
+
+**Support cost is apportioned, not measured.** `support_ticket` has no product line, so
+each line is charged the share matching its share of customers. It is an allocation; a
+line whose customers are unusually expensive to support would be understated.
+
+**The three lines are nearly identical** — net revenue within 2.5% and customers within
+2% of each other. That is how this demo data was generated, not a finding. Do not read
+the ranking as performance.
+
+**Bars scale per column**, each against that column's own maximum, so lengths compare
+down a column and never across one.
+""")
+
+
 if page == HOME:
     overview()
 elif page == BUYERS:
     buyers()
+elif page == PERF:
+    performance()
 else:
     placeholder(page)

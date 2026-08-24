@@ -61,6 +61,7 @@ def css() -> str:
   .dg-rule {{ height:1px; background:{BORDER_SOFT}; margin:22px 0 20px; }}
   .dg-blank {{ font-size:16px; font-weight:600; color:#3A4653; }}
   .dg-navgap {{ height:24px; }}
+  .dg-rowgap {{ height:18px; }}
 
   /* --- sidebar navigation -------------------------------------------------
      Scoped by ancestor, so the main page's chip rules cannot leak in and the
@@ -87,8 +88,12 @@ def css() -> str:
   section[data-testid="stSidebar"] .stButton > button:hover {{
       background:rgba(255,255,255,.04) !important; color:{TEXT} !important;
       border-left-color:{CHIP_EDGE_HOVER} !important; }}
-  .dg-navactive {{ border-left:2px solid {ACCENT}; background:rgba(34,211,238,.09);
-      padding:8px 12px 8px 12px; font-size:13px; font-weight:600; color:{ACCENT}; }}
+  /* The active row is a DISABLED button, so it shares the box model of every other
+     row exactly. Streamlit dims disabled buttons, hence opacity:1. */
+  section[data-testid="stSidebar"] .stButton > button:disabled {{
+      color:{ACCENT} !important; font-weight:600 !important; opacity:1 !important;
+      border-left-color:{ACCENT} !important;
+      background:rgba(34,211,238,.09) !important; cursor:default !important; }}
 
   /* Group headers: tap to open. A group header is a nav row, so it gets the same
      visual language as one -- flat, full-width, square, with a left-edge cue. Streamlit
@@ -154,8 +159,30 @@ def css() -> str:
              min-height:15px; }}
   .dg-spark {{ display:block; margin-top:10px; }}
 
+  /* --- row table: one row per entity, bar + value per measure (C27) --- */
+  .rt-wrap {{ overflow-x:auto; }}
+  .rt {{ width:100%; border-collapse:collapse; border:0 !important; }}
+  .rt tr, .rt tbody, .rt thead {{ border:0 !important; background:none !important; }}
+  .rt th {{ font-size:9.5px; letter-spacing:.06em; text-transform:uppercase;
+            font-weight:500; text-align:left; padding:0 4px 9px 0; color:{DIM};
+            border:0 !important; white-space:nowrap; }}
+  .rt td {{ padding:5px 4px 5px 0; border:0 !important; vertical-align:middle; }}
+  .rt-u {{ font-size:9px; color:{DIM}; text-align:left; padding:0 14px 9px 0 !important; }}
+  .rt-lbl {{ white-space:nowrap; font-size:13px; color:{TEXT}; padding-right:20px; }}
+  .rt-track {{ width:{_TRACK_PX}px; height:11px; display:inline-block;
+               vertical-align:middle; overflow:hidden; }}
+  .rt-fill {{ height:11px; display:inline-block; }}
+  .rt-bc {{ padding-right:7px !important; }}
+  /* Value sits immediately right of ITS OWN bar and left-aligned. Right-aligned, each
+     number drifts toward the NEXT measure's bar and reads as belonging to it. */
+  .rt-v {{ font-size:13px; font-variant-numeric:tabular-nums; white-space:nowrap;
+           text-align:left; padding-right:16px !important; color:{TEXT}; }}
+
   /* --- filter chips: a real control, it moves every tile --- */
-  div[role="radiogroup"] {{ gap:6px !important; }}
+  div[role="radiogroup"] {{ gap:6px !important; max-width:430px; }}
+  /* Capping the row is what makes Source wrap to two tidy lines instead of one
+     long one, so the filter block claims far less width. Date range needs 276px
+     and stays on a single row under the same cap. */
   div[role="radiogroup"] label {{
       border:1px solid {CHIP_EDGE}; border-radius:99px; padding:5px 11px;
       background:transparent; font-size:12px; margin:0 !important; }}
@@ -312,3 +339,64 @@ def kpi(label: str, value: str, delta_html: str = "", spark_html: str = "",
         '<div class="dg-sub">%s</div>'
         "</div>" % (label, value, delta_html, spark_html, sub or "&nbsp;")
     )
+
+
+_TRACK_PX = 84
+
+
+def rows_table(df, label_col: str, specs, label_head: str) -> str:
+    """One row per entity, and for each measure a bar plus its value on the same line.
+
+    specs = [(header, unit, column, fmt, inverse)]. Each column's bar scales to that
+    column's OWN maximum, keyed on the DATAFRAME COLUMN and never the header text -- two
+    measures can legitimately share a header, and keying on the label silently scales one
+    against the other's maximum and renders a zero-width bar.
+
+    Units live in the header once, so values print bare. There is no axis and no
+    gridline: the number sits beside its own bar, so there is nothing to read off.
+    """
+    import pandas as _pd
+
+    def fmt(kind, v):
+        if v is None or (isinstance(v, float) and _pd.isna(v)):
+            return "–"
+        if kind == "m":
+            return f"{v / 1_000_000:,.2f}"
+        if kind == "k":
+            return f"{v / 1_000:,.0f}"
+        if kind == "p1":
+            return f"{v:,.1f}"
+        if kind == "r2":
+            return f"{v:,.2f}"
+        return f"{v:,.0f}"
+
+    head = f'<th class="rt-h">{label_head}</th>'
+    for header, unit, _c, _k, _inv in specs:
+        head += (f'<th class="rt-h" colspan="2">{header}</th>' if not unit
+                 else f'<th class="rt-h">{header}</th><th class="rt-u">{unit}</th>')
+
+    maxes = {}
+    for _h, _u, col, _k, _inv in specs:
+        vals = [v for v in df[col] if v is not None and not _pd.isna(v)]
+        maxes[col] = max(vals) if vals else 0.0
+
+    body = ""
+    for _, row in df.iterrows():
+        cells = f'<td class="rt-lbl">{row[label_col]}</td>'
+        for _h, _u, col, kind, inverse in specs:
+            v, mx = row[col], maxes[col]
+            blank = v is None or _pd.isna(v)
+            norm = 0.0 if (blank or mx <= 0 or v <= 0) else min(1.0, float(v) / float(mx))
+            c = BAD if inverse else ACCENT
+            trk = "rgba(248,113,113,.15)" if inverse else "rgba(34,211,238,.14)"
+            # A real-but-tiny value keeps a visible sliver; a true zero draws nothing, so
+            # "small" and "none" are never the same picture.
+            w = 0 if norm == 0 else max(2.0, norm * _TRACK_PX)
+            cells += (
+                f'<td class="rt-bc"><span class="rt-track" style="background:{trk}">'
+                f'<span class="rt-fill" style="width:{w:.1f}px;background:{c}"></span>'
+                f"</span></td>"
+                f'<td class="rt-v">{fmt(kind, v)}</td>'
+            )
+        body += f"<tr>{cells}</tr>"
+    return f'<div class="rt-wrap"><table class="rt"><tr>{head}</tr>{body}</table></div>'

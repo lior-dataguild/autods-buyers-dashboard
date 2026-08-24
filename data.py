@@ -232,3 +232,102 @@ def _daily(days: int, channel: str, cache_v: int) -> pd.DataFrame:
 
 def daily(days: int, channel: str = ALL) -> pd.DataFrame:
     return _daily(days, _guard(channel), _CACHE_V)
+
+
+# ---------------------------------------------------------------- performance
+# Per product line. revenue_recognition carries product_line_id directly (0 NULLs on
+# all 250,000 rows), so revenue needs no join chain. Ad spend reaches a product line
+# through marketing_campaign.product_line_id -- but 14.7% of spend in a 30-day window
+# sits on campaigns with NO product line, so per-line MER and CM% cannot see it. That
+# gap is stated on the page rather than silently distributed.
+@st.cache_data(ttl=3600, show_spinner=False)
+def _performance(days: int, cache_v: int) -> pd.DataFrame:
+    sql = f"""
+    WITH mx AS (SELECT DATE(MAX(occurred_at)) AS d1 FROM {D}.payment`),
+    w AS (SELECT DATE_SUB(d1, INTERVAL {days - 1} DAY) AS a, d1 AS b FROM mx),
+    rev AS (
+      SELECT r.product_line_id AS pl,
+             SUM(r.recognized_amount_usd) AS gross,
+             -SUM(r.refund_adjustment_usd) AS refunds,
+             SUM(r.recognized_amount_usd + r.refund_adjustment_usd) AS net,
+             COUNT(DISTINCT r.user_id) AS customers
+      FROM {D}.revenue_recognition` r CROSS JOIN w
+      WHERE r.recognized_month BETWEEN w.a AND w.b GROUP BY 1
+    ), ad AS (
+      SELECT mc.product_line_id AS pl, SUM(c.amount_usd) AS ad_spend
+      FROM {D}.campaign_spend` c
+      JOIN {D}.marketing_campaign` mc ON mc.campaign_id = c.campaign_id
+      CROSS JOIN w
+      WHERE c.{AD_DATE} BETWEEN w.a AND w.b AND mc.product_line_id IS NOT NULL
+      GROUP BY 1
+    ), sup AS (
+      -- Support cost has no product line, so it is apportioned by each line's share of
+      -- customers. Stated on the page: it is an allocation, not a measurement.
+      SELECT SUM(t.cost_usd) AS total_support
+      FROM {D}.support_ticket` t CROSS JOIN w
+      WHERE DATE(t.created_at) BETWEEN w.a AND w.b
+    ), daily AS (
+      SELECT r.product_line_id AS pl, r.recognized_month AS d,
+             SUM(r.recognized_amount_usd + r.refund_adjustment_usd) AS net
+      FROM {D}.revenue_recognition` r CROSS JOIN w
+      WHERE r.recognized_month BETWEEN w.a AND w.b GROUP BY 1, 2
+    ), trend AS (
+      SELECT pl, ARRAY_AGG(net ORDER BY d) AS net_trend FROM daily GROUP BY pl
+    )
+    SELECT plt.category AS line, plt.name AS family, plt.status,
+           rev.net, rev.gross, rev.refunds, rev.customers,
+           IFNULL(ad.ad_spend, 0) AS ad_spend,
+           (SELECT total_support FROM sup)
+             * SAFE_DIVIDE(rev.customers,
+                           (SELECT SUM(customers) FROM rev)) AS support_alloc,
+           trend.net_trend
+    FROM rev
+    -- Table alias must NOT be `pl`: that is already the column alias for
+    -- product_line_id in these CTEs, and USING(pl) then resolves to the table.
+    JOIN {D}.product_line` plt ON plt.product_line_id = rev.pl
+    LEFT JOIN ad USING(pl)
+    LEFT JOIN trend USING(pl)
+    ORDER BY rev.net DESC
+    """
+    df = client().query(sql).to_dataframe()
+    for c in ("net", "gross", "refunds", "ad_spend", "support_alloc"):
+        df[c] = pd.to_numeric(df[c], errors="coerce")
+    df["customers"] = pd.to_numeric(df["customers"], errors="coerce")
+    df["cm"] = df["net"] - df["ad_spend"] - df["support_alloc"]
+    # Every ratio guards its denominator's SIGN, not just zero (Q3).
+    df["refund_pct"] = [100 * r / g if g > 0 else None
+                        for r, g in zip(df["refunds"], df["gross"])]
+    df["cm_pct"] = [100 * c / n if n > 0 else None
+                    for c, n in zip(df["cm"], df["net"])]
+    df["mer"] = [n / a if a > 0 else None
+                 for n, a in zip(df["net"], df["ad_spend"])]
+    df["net_trend"] = [list(x) if x is not None else [] for x in df["net_trend"]]
+    return df
+
+
+def performance(days: int) -> pd.DataFrame:
+    return _performance(days, _CACHE_V)
+
+
+@st.cache_data(ttl=3600, show_spinner=False)
+def _ad_spend_unattributed(days: int, cache_v: int) -> dict:
+    """Share of ad spend that carries no product line, so the page can say so."""
+    sql = f"""
+    WITH mx AS (SELECT DATE(MAX(occurred_at)) AS d1 FROM {D}.payment`),
+    w AS (SELECT DATE_SUB(d1, INTERVAL {days - 1} DAY) AS a, d1 AS b FROM mx)
+    SELECT SUM(c.amount_usd) AS total,
+           SUM(IF(mc.product_line_id IS NULL, c.amount_usd, 0)) AS unattributed
+    FROM {D}.campaign_spend` c
+    JOIN {D}.marketing_campaign` mc ON mc.campaign_id = c.campaign_id
+    CROSS JOIN w
+    WHERE c.{AD_DATE} BETWEEN w.a AND w.b
+    """
+    r = client().query(sql).to_dataframe().iloc[0]
+    total = float(r["total"] or 0)
+    un = float(r["unattributed"] or 0)
+    return {"total": total, "unattributed": un,
+            "pct": (100 * un / total) if total > 0 else None}
+
+
+def ad_spend_unattributed(days: int) -> dict:
+    return _ad_spend_unattributed(days, _CACHE_V)
