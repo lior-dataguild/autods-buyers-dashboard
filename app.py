@@ -127,11 +127,15 @@ if page in FILTERED:
     t = data.totals(days, channel)
     d = data.daily(days, channel)
 
-    # Short form. The reason windows run back from the data's last day rather than from
-    # today is stated in the info disclosure below, so it is not lost by trimming here.
+    # The date is read from the data, never typed, so this line cannot go stale or
+    # claim a completeness the dataset does not have.
+    #
+    # Deliberately NOT "Today is excluded": that phrasing says one partial day is
+    # missing. This dataset stops 68 days before today, so it would understate the gap
+    # by two months. "Everything after is excluded" is the same shape and true.
     line_slot.markdown(
-        f'<div class="dg-complete">Data ends <b>{t["d1"]:%d %b %Y}</b>'
-        f'&nbsp; · &nbsp;prior period {t["p0"]:%d %b} – {t["p1"]:%d %b %Y}</div>',
+        f'<div class="dg-complete">Complete through <b>{t["d1"]:%A %d %B %Y}</b>. '
+        f"Everything after is excluded.</div>",
         unsafe_allow_html=True,
     )
     st.markdown('<div class="dg-rule"></div>', unsafe_allow_html=True)
@@ -200,6 +204,11 @@ that carries ad cost.
 
 **Ad spend is windowed on `period_start` alone.** `period_end` is unusable: on 1,482 of
 2,000 rows (74.1%, carrying $15.99M of $21.46M) it falls *before* `period_start`.
+
+**The window is measured back from the data's last day, not from today.** The dataset ends
+{t['d1']:%d %b %Y}; a window anchored to the current date would return nothing. The delta
+compares the selected window against the equally-long one immediately before it —
+currently **{t['p0']:%d %b} – {t['p1']:%d %b %Y}**.
 
 **Deltas** are in each metric's own unit — percent for levels, percentage points for rates,
 absolute for MER — coloured by whether that direction is good for that metric, so refunds
