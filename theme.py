@@ -47,6 +47,17 @@ def css() -> str:
              color:{ACCENT}; font-weight:700; margin:26px 0 11px; }}
   .dg-fl {{ font-size:10px; letter-spacing:.1em; text-transform:uppercase;
             color:{DIM}; margin:0 0 7px; }}
+  .dg-rule {{ height:1px; background:{BORDER_SOFT}; margin:22px 0 20px; }}
+  .dg-blank {{ font-size:16px; font-weight:600; color:#3A4653; }}
+
+  /* Bottom dashboard tabs */
+  [data-testid="stTabs"] [data-baseweb="tab-list"] {{ gap:4px; border-bottom:1px solid {BORDER_SOFT}; }}
+  [data-testid="stTabs"] [data-baseweb="tab"] {{
+      background:transparent; border-radius:6px 6px 0 0; padding:8px 15px;
+      color:{MUTED}; font-size:13px; }}
+  [data-testid="stTabs"] [aria-selected="true"] {{
+      color:{ACCENT} !important; background:{PANEL}; }}
+  [data-testid="stTabs"] [data-baseweb="tab-highlight"] {{ background:{ACCENT}; }}
 
   /* --- KPI tile --- */
   .dg-card {{ border:1px solid {BORDER}; border-radius:7px; padding:15px 17px 13px;
@@ -131,7 +142,15 @@ def spark(vals, w: int = 200, h: int = 34, color: str | None = None) -> str:
     if len(cur) > 1:
         segs.append(cur)
 
-    paths = "".join(
+    # A faint fill under the line, as in the reference. It carries no extra information,
+    # so it stays well below the stroke in contrast -- the line is still the data.
+    rgb = ",".join(str(int(c.lstrip("#")[i:i + 2], 16)) for i in (0, 2, 4))
+    fills = "".join(
+        f'<polygon points="{s[0].split(",")[0]},{h} {" ".join(s)} '
+        f'{s[-1].split(",")[0]},{h}" fill="rgba({rgb},0.13)" stroke="none"/>'
+        for s in segs
+    )
+    paths = fills + "".join(
         f'<polyline points="{" ".join(s)}" fill="none" stroke="{c}" '
         f'stroke-width="1.7" stroke-linejoin="round"/>' for s in segs
     )
