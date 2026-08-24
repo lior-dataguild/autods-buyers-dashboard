@@ -1,3 +1,5 @@
+from __future__ import annotations   # local venv is 3.9; PEP 604 unions are 3.10+
+
 """BigQuery access for the DG dashboard suite.
 
 Every window is measured back from the data's own last date, never CURRENT_DATE():
@@ -10,12 +12,16 @@ from google.oauth2 import service_account
 
 PROJECT_ID = "dg-demo-data"
 DATASET = "demo_autods_demo_v1_v1"
-T = f"`{PROJECT_ID}.{DATASET}"
+D = f"`{PROJECT_ID}.{DATASET}"
 
-# A purchase = a SUCCEEDED payment that is not a refund or chargeback.
-# Both filters are load-bearing: 14.9% of payment rows are not succeeded, and this
-# dataset stores refunds/chargebacks as POSITIVE rows, so they would count as buys.
+# A purchase = a SUCCEEDED payment that is not a refund or chargeback. Both filters are
+# load-bearing: 14.9% of payment rows are not succeeded, and this dataset stores refunds
+# and chargebacks as POSITIVE rows, so they would otherwise count as purchases.
 PURCHASE = "status = 'succeeded' AND payment_type NOT IN ('refund','chargeback')"
+
+# Ad spend is windowed on period_start only. period_end is unusable: on 1,482 of 2,000
+# rows (74.1%, carrying $15.99M of $21.46M) it falls BEFORE period_start.
+AD_DATE = "period_start"
 
 
 @st.cache_resource
@@ -26,86 +32,125 @@ def client() -> bigquery.Client:
     return bigquery.Client(credentials=creds, project=PROJECT_ID)
 
 
-@st.cache_data(ttl=3600, show_spinner=False)
-def totals(days: int) -> dict:
-    sql = f"""
-    WITH win AS (
-      SELECT DATE_SUB(DATE(MAX(occurred_at)), INTERVAL {days - 1} DAY) AS d0,
-             DATE(MAX(occurred_at)) AS d1
-      FROM {T}.payment`
-    )
-    SELECT
-      (SELECT d0 FROM win) AS d0,
-      (SELECT d1 FROM win) AS d1,
-      -- NOT the sum of the daily values: a user buying on two days is one buyer.
-      (SELECT COUNT(DISTINCT user_id) FROM {T}.payment`, win
-         WHERE DATE(occurred_at) BETWEEN d0 AND d1 AND {PURCHASE}) AS buyers,
-      (SELECT SUM(recognized_amount_usd + refund_adjustment_usd)
-         FROM {T}.revenue_recognition`, win
-         WHERE recognized_month BETWEEN d0 AND d1) AS net_revenue,
-      (SELECT SUM(recognized_amount_usd) FROM {T}.revenue_recognition`, win
-         WHERE recognized_month BETWEEN d0 AND d1) AS gross_revenue,
-      (SELECT -SUM(refund_adjustment_usd) FROM {T}.revenue_recognition`, win
-         WHERE recognized_month BETWEEN d0 AND d1) AS refunds,
-      (SELECT COUNT(*) FROM {T}.subscription`, win
-         WHERE DATE(started_at) BETWEEN d0 AND d1) AS new_subs
+def _components_sql(days: int) -> str:
+    """Raw components for the current window and the equally-long window before it.
+
+    Deltas are computed from these, never from a ratio scaled off a total (B3).
     """
-    r = client().query(sql).to_dataframe().iloc[0]
-    gross = float(r["gross_revenue"] or 0)
-    refunds = float(r["refunds"] or 0)
+    return f"""
+    WITH mx AS (SELECT DATE(MAX(occurred_at)) AS d1 FROM {D}.payment`),
+    w AS (
+      SELECT 'cur' AS per, DATE_SUB(d1, INTERVAL {days - 1} DAY) AS a, d1 AS b FROM mx
+      UNION ALL
+      SELECT 'pri', DATE_SUB(d1, INTERVAL {2 * days - 1} DAY),
+                    DATE_SUB(d1, INTERVAL {days} DAY) FROM mx
+    ), rev AS (
+      SELECT w.per, SUM(r.recognized_amount_usd) AS gross,
+             -SUM(r.refund_adjustment_usd) AS refunds,
+             SUM(r.recognized_amount_usd + r.refund_adjustment_usd) AS net
+      FROM {D}.revenue_recognition` r
+      JOIN w ON r.recognized_month BETWEEN w.a AND w.b GROUP BY 1
+    ), pay AS (
+      SELECT w.per, COUNT(*) AS purchases, COUNT(DISTINCT p.user_id) AS customers
+      FROM {D}.payment` p JOIN w ON DATE(p.occurred_at) BETWEEN w.a AND w.b
+      WHERE {PURCHASE} GROUP BY 1
+    ), ad AS (
+      SELECT w.per, SUM(c.amount_usd) AS ad_spend
+      FROM {D}.campaign_spend` c JOIN w ON c.{AD_DATE} BETWEEN w.a AND w.b GROUP BY 1
+    ), sup AS (
+      SELECT w.per, SUM(t.cost_usd) AS support_cost
+      FROM {D}.support_ticket` t JOIN w ON DATE(t.created_at) BETWEEN w.a AND w.b GROUP BY 1
+    )
+    SELECT w.per, w.a AS win_from, w.b AS win_to,
+           rev.net, rev.gross, rev.refunds, pay.purchases, pay.customers,
+           ad.ad_spend, sup.support_cost
+    FROM w JOIN rev USING(per) JOIN pay USING(per)
+           JOIN ad USING(per) JOIN sup USING(per)
+    """
+
+
+def _derive(r) -> dict:
+    """Derived measures, each guarding its denominator's SIGN and not just zero (Q3).
+
+    5.3% of revenue_recognition rows net below zero, so a bare divide here can return a
+    confident, flattering number rather than an obviously broken one.
+    """
+    net = float(r["net"])
+    gross = float(r["gross"])
+    ad = float(r["ad_spend"])
+    sup = float(r["support_cost"])
+    cm = net - ad - sup
     return {
-        "d0": pd.to_datetime(r["d0"]),
-        "d1": pd.to_datetime(r["d1"]),
-        "buyers": int(r["buyers"]),
-        "net_revenue": float(r["net_revenue"] or 0),
+        "net_revenue": net,
         "gross_revenue": gross,
-        "refunds": refunds,
-        "new_subs": int(r["new_subs"]),
-        # Q3: guard the denominator's SIGN, not just zero. 5.3% of revrec rows net
-        # below zero, so a bare SAFE_DIVIDE here can return a flattering nonsense rate.
-        "refund_rate": (refunds / gross) if gross > 0 else None,
+        "refunds": float(r["refunds"]),
+        "purchases": int(r["purchases"]),
+        "customers": int(r["customers"]),
+        "ad_spend": ad,
+        "support_cost": sup,
+        "cm": cm,
+        "refund_pct": (100 * float(r["refunds"]) / gross) if gross > 0 else None,
+        "cm_pct": (100 * cm / net) if net > 0 else None,
+        "mer": (net / ad) if ad > 0 else None,
     }
 
 
 @st.cache_data(ttl=3600, show_spinner=False)
+def totals(days: int) -> dict:
+    df = client().query(_components_sql(days)).to_dataframe()
+    cur = df[df["per"] == "cur"].iloc[0]
+    pri = df[df["per"] == "pri"].iloc[0]
+    out = {"cur": _derive(cur), "pri": _derive(pri)}
+    out["d0"] = pd.to_datetime(cur["win_from"])
+    out["d1"] = pd.to_datetime(cur["win_to"])
+    out["p0"] = pd.to_datetime(pri["win_from"])
+    out["p1"] = pd.to_datetime(pri["win_to"])
+    return out
+
+
+@st.cache_data(ttl=3600, show_spinner=False)
 def daily(days: int) -> pd.DataFrame:
-    """Long format: one row per (day, metric). Reindexed so a quiet day is a real zero
-    (B19) rather than a gap the line would bridge."""
+    """One row per calendar day, built off a date spine so a quiet day is a real zero
+    (B19) rather than a gap the line would silently bridge. Ratios are computed inside
+    each day, never scaled from the window total (B3)."""
     sql = f"""
-    WITH win AS (
-      SELECT DATE_SUB(DATE(MAX(occurred_at)), INTERVAL {days - 1} DAY) AS d0,
-             DATE(MAX(occurred_at)) AS d1
-      FROM {T}.payment`
-    ), b AS (
-      SELECT DATE(occurred_at) AS d, 'buyers' AS metric,
-             CAST(COUNT(DISTINCT user_id) AS FLOAT64) AS value
-      FROM {T}.payment`, win
-      WHERE DATE(occurred_at) BETWEEN d0 AND d1 AND {PURCHASE} GROUP BY 1
-    ), r AS (
-      SELECT recognized_month AS d, 'net_revenue',
-             SUM(recognized_amount_usd + refund_adjustment_usd)
-      FROM {T}.revenue_recognition`, win
-      WHERE recognized_month BETWEEN d0 AND d1 GROUP BY 1
-    ), s AS (
-      SELECT DATE(started_at) AS d, 'new_subs', CAST(COUNT(*) AS FLOAT64)
-      FROM {T}.subscription`, win
-      WHERE DATE(started_at) BETWEEN d0 AND d1 GROUP BY 1
+    WITH mx AS (SELECT DATE(MAX(occurred_at)) AS d1 FROM {D}.payment`),
+    w AS (SELECT DATE_SUB(d1, INTERVAL {days - 1} DAY) AS a, d1 AS b FROM mx),
+    spine AS (SELECT d FROM w, UNNEST(GENERATE_DATE_ARRAY(a, b)) AS d),
+    rev AS (
+      SELECT recognized_month AS d, SUM(recognized_amount_usd) AS gross,
+             -SUM(refund_adjustment_usd) AS refunds,
+             SUM(recognized_amount_usd + refund_adjustment_usd) AS net
+      FROM {D}.revenue_recognition`, w
+      WHERE recognized_month BETWEEN a AND b GROUP BY 1
+    ), pay AS (
+      SELECT DATE(occurred_at) AS d, COUNT(*) AS purchases,
+             COUNT(DISTINCT user_id) AS customers
+      FROM {D}.payment`, w
+      WHERE DATE(occurred_at) BETWEEN a AND b AND {PURCHASE} GROUP BY 1
+    ), ad AS (
+      SELECT {AD_DATE} AS d, SUM(amount_usd) AS ad_spend
+      FROM {D}.campaign_spend`, w WHERE {AD_DATE} BETWEEN a AND b GROUP BY 1
+    ), sup AS (
+      SELECT DATE(created_at) AS d, SUM(cost_usd) AS support_cost
+      FROM {D}.support_ticket`, w WHERE DATE(created_at) BETWEEN a AND b GROUP BY 1
     )
-    SELECT * FROM b UNION ALL SELECT * FROM r UNION ALL SELECT * FROM s
-    ORDER BY metric, d
+    SELECT spine.d,
+      IFNULL(rev.net, 0)        AS net_revenue,
+      IFNULL(pay.purchases, 0)  AS purchases,
+      IFNULL(pay.customers, 0)  AS customers,
+      IF(rev.gross > 0, 100 * rev.refunds / rev.gross, NULL) AS refund_pct,
+      IF(rev.net > 0,
+         100 * (rev.net - IFNULL(ad.ad_spend,0) - IFNULL(sup.support_cost,0)) / rev.net,
+         NULL) AS cm_pct,
+      IF(IFNULL(ad.ad_spend, 0) > 0, rev.net / ad.ad_spend, NULL) AS mer
+    FROM spine LEFT JOIN rev USING(d) LEFT JOIN pay USING(d)
+               LEFT JOIN ad USING(d) LEFT JOIN sup USING(d)
+    ORDER BY d
     """
     df = client().query(sql).to_dataframe()
     # BigQuery DATE arrives as db_dtypes.dbdate, which has no datetime methods.
     df["d"] = pd.to_datetime(df["d"])
-
-    full = pd.date_range(df["d"].min(), df["d"].max(), freq="D")
-    out = []
-    for m, g in df.groupby("metric"):
-        g = g.set_index("d").reindex(full, fill_value=0.0)
-        g["metric"] = m
-        out.append(g.rename_axis("d").reset_index())
-    return pd.concat(out, ignore_index=True)
-
-
-def series(df: pd.DataFrame, metric: str) -> pd.DataFrame:
-    return df[df["metric"] == metric].sort_values("d").reset_index(drop=True)
+    for c in ("net_revenue", "purchases", "customers", "refund_pct", "cm_pct", "mer"):
+        df[c] = pd.to_numeric(df[c], errors="coerce")
+    return df
