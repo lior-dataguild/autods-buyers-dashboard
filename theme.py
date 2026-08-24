@@ -58,6 +58,36 @@ def css() -> str:
   .dg-rule {{ height:1px; background:{BORDER_SOFT}; margin:22px 0 20px; }}
   .dg-blank {{ font-size:16px; font-weight:600; color:#3A4653; }}
 
+  /* --- sidebar navigation -------------------------------------------------
+     Scoped by ancestor, so the main page's chip rules cannot leak in and the
+     ancestor selector wins on specificity without !important gymnastics. If the
+     scoping ever fails the nav merely looks like chips -- ugly, never broken. */
+  section[data-testid="stSidebar"] {{ background:{PANEL};
+      border-right:1px solid {BORDER_SOFT}; }}
+  section[data-testid="stSidebar"] .block-container,
+  section[data-testid="stSidebar"] > div {{ padding-top:1.4rem; }}
+  .dg-navlogo {{ font-family:{MONO}; font-size:24px; font-weight:700;
+      letter-spacing:.16em; color:{ACCENT}; line-height:1;
+      padding:0 12px 4px; display:block; }}
+  .dg-navlabel {{ font-size:10px; letter-spacing:.13em; text-transform:uppercase;
+      color:{DIM}; padding:0 12px; margin:20px 0 8px; }}
+  section[data-testid="stSidebar"] div[role="radiogroup"] {{
+      gap:1px !important; flex-direction:column !important; }}
+  section[data-testid="stSidebar"] div[role="radiogroup"] label {{
+      border:0 !important; border-left:2px solid transparent !important;
+      border-radius:0 !important; padding:9px 12px !important;
+      width:100% !important; background:transparent !important; }}
+  section[data-testid="stSidebar"] div[role="radiogroup"] label p {{
+      color:{CHIP_TEXT} !important; font-size:13px !important;
+      font-weight:400 !important; }}
+  section[data-testid="stSidebar"] div[role="radiogroup"] label:hover {{
+      background:rgba(255,255,255,.03) !important; }}
+  section[data-testid="stSidebar"] div[role="radiogroup"] label:has(input:checked) {{
+      border-left-color:{ACCENT} !important; background:rgba(34,211,238,.09) !important; }}
+  section[data-testid="stSidebar"] div[role="radiogroup"] label:has(input:checked) p {{
+      color:{ACCENT} !important; font-weight:600 !important; }}
+  .dg-soon {{ font-size:11px; color:{DIM}; padding:0 12px; margin-top:3px; }}
+
   /* Bottom dashboard tabs */
   [data-testid="stTabs"] [data-baseweb="tab-list"] {{ gap:4px; border-bottom:1px solid {BORDER_SOFT}; }}
   [data-testid="stTabs"] [data-baseweb="tab"] {{
