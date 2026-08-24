@@ -123,7 +123,11 @@ if page in DATE_FILTERED:
     # absorbing the remainder. Measured needs are 276px and 725px; this split leaves
     # each comfortably clear, because an exact fit is not a fit.
     show_source = page in SOURCE_FILTERED
-    f1, f2 = st.columns([1, 3.4], gap="small")
+    # Weights sized from measured chip widths: col1 ~330px holds all 3 date chips on
+    # one row; col2 ~447px holds exactly 4 source chips, so the 8 wrap 4 + 4. The third
+    # column is a spacer -- without it the first two stretch and the Source row would
+    # fit more than 4. gap="large" is the requested separation between the groups.
+    f1, f2, _pad = st.columns([340, 460, 600], gap="large")
     with f1:
         st.markdown('<div class="dg-fl">Date range</div>', unsafe_allow_html=True)
         wlabel = st.radio("Date range", list(WINDOWS), horizontal=True,

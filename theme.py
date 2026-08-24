@@ -179,10 +179,10 @@ def css() -> str:
            text-align:left; padding-right:16px !important; color:{TEXT}; }}
 
   /* --- filter chips: a real control, it moves every tile --- */
-  div[role="radiogroup"] {{ gap:6px !important; max-width:430px; }}
-  /* Capping the row is what makes Source wrap to two tidy lines instead of one
-     long one, so the filter block claims far less width. Date range needs 276px
-     and stays on a single row under the same cap. */
+  div[role="radiogroup"] {{ gap:6px !important; }}
+  /* No blanket max-width: the two groups need different widths (3 chips on one
+     row vs 4 per row), so their COLUMNS govern where each wraps. One cap for
+     both cannot express two different layouts. */
   div[role="radiogroup"] label {{
       border:1px solid {CHIP_EDGE}; border-radius:99px; padding:5px 11px;
       background:transparent; font-size:12px; margin:0 !important; }}
@@ -205,7 +205,13 @@ def css() -> str:
       border-color:transparent !important; }}
   /* The <p> carries its own colour, so setting it on the label does nothing. */
   div[role="radiogroup"] label p {{
-      font-size:12px !important; color:{CHIP_TEXT} !important; }}
+      font-size:12px !important; color:{CHIP_TEXT} !important;
+      margin:0 !important; padding:0 !important; }}
+  /* The text wrapper reserved 8px to clear the radio dot. With the dot gone that is
+     dead space inside the pill, so the label is no longer just its text. Guarded with
+     :has(p) so it can only ever match the text box itself. */
+  div[role="radiogroup"] label > div:has(p) {{
+      padding:0 !important; margin:0 !important; }}
   div[role="radiogroup"] label:hover {{ border-color:{CHIP_EDGE_HOVER}; }}
   div[role="radiogroup"] label:hover p {{ color:{TEXT} !important; }}
   div[role="radiogroup"] label:has(input:checked) {{
