@@ -37,12 +37,15 @@ ALL = "All channels"
 
 # Selectable sources. Whitelisted rather than interpolated from user input.
 #
-# user.acquisition_channel also holds `content_seo` and `email`; both are deliberately
-# not offered as individual selections. Their rows are still inside "All channels", so
-# the all-up figures are unchanged -- they simply cannot be isolated from the UI.
+# user.acquisition_channel holds nine values; four are deliberately not offered as
+# individual selections -- `content_seo`, `email`, `referral` and `affiliate`. Their rows
+# are still inside "All channels", so every all-up figure is unchanged; they simply
+# cannot be isolated from the UI.
+#
+# `organic_direct` is the only NO-AD-SPEND channel still selectable, so the MER blanking
+# in _derive() is still reachable and still needed.
 CHANNELS = [
-    "paid_search", "paid_social", "youtube_ads", "tiktok_ads",
-    "organic_direct", "referral", "affiliate",
+    "paid_search", "paid_social", "youtube_ads", "tiktok_ads", "organic_direct",
 ]
 
 # marketing_campaign.channel carries only these. The three acquisition channels absent

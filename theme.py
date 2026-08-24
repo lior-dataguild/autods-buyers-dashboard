@@ -187,12 +187,13 @@ def css() -> str:
      :has(label:nth-child(N)) keys on the option count, which is stable, rather than on
      DOM position, which is not.
        3 options  -> Date range, 256px, all three on one row
-       8 options  -> Source, 356px, exactly 4 per row so the 8 land 4 + 4
-     Change the chip padding and these two numbers move with it; they are the only two
-     places that need touching. */
+       6 options  -> Source, 270px, exactly 3 per row so the 6 land 3 + 3
+     THE OPTION COUNT IS PART OF THE SELECTOR. Add or remove a source channel and the
+     nth-child number here must change with it, or the group loses its pinned width and
+     goes back to wrapping wherever the viewport happens to put it. */
   div[role="radiogroup"]:has(label:nth-child(3)):not(:has(label:nth-child(4))) {{
       width:256px; }}
-  div[role="radiogroup"]:has(label:nth-child(8)) {{ width:356px; }}
+  div[role="radiogroup"]:has(label:nth-child(6)) {{ width:270px; }}
   /* The box hugs its text. Padding was 8px 17px, so a 68px word sat in a 104px chip --
      the border was 53% wider than the thing it enclosed.
      The radius drops from 999px to 6px with it, and that is not a style change for its
