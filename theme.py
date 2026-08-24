@@ -182,18 +182,19 @@ def css() -> str:
 
   /* --- filter chips: a real control, it moves every tile --- */
   div[role="radiogroup"] {{ gap:6px !important; }}
-  /* Each group's width is PINNED, keyed on how many options it has -- not left to a
-     proportional column, which is what made the wrap break on a narrower viewport.
-     :has(label:nth-child(N)) keys on the option count, which is stable, rather than on
-     DOM position, which is not.
-       3 options  -> Date range, 256px, all three on one row
-       6 options  -> Source, 270px, exactly 3 per row so the 6 land 3 + 3
-     THE OPTION COUNT IS PART OF THE SELECTOR. Add or remove a source channel and the
-     nth-child number here must change with it, or the group loses its pinned width and
-     goes back to wrapping wherever the viewport happens to put it. */
-  div[role="radiogroup"]:has(label:nth-child(3)):not(:has(label:nth-child(4))) {{
-      width:256px; }}
-  div[role="radiogroup"]:has(label:nth-child(6)) {{ width:270px; }}
+  /* Each group's width is PINNED so the wrap does not depend on the viewport.
+     Keyed on WHICH COLUMN the group sits in, not on how many options it has. The
+     previous version counted labels with :has(label:nth-child(N)), which had two
+     problems: the number had to be edited every time a channel was added or removed,
+     and nth-child counts ALL children -- so on a Streamlit build whose radiogroup holds
+     any non-label node the count silently misses and the group unpins. That is the same
+     local-vs-Cloud DOM difference that once blanked every chip.
+     Only the two filter columns contain a radiogroup, so these cannot hit the KPI or
+     chart columns.
+       column 1 -> Date range, 256px, three on one row
+       column 2 -> Source,     285px, three per row so six land 3 + 3 */
+  [data-testid="stColumn"]:nth-of-type(1) div[role="radiogroup"] {{ width:256px; }}
+  [data-testid="stColumn"]:nth-of-type(2) div[role="radiogroup"] {{ width:285px; }}
   /* The box hugs its text. Padding was 8px 17px, so a 68px word sat in a 104px chip --
      the border was 53% wider than the thing it enclosed.
      The radius drops from 999px to 6px with it, and that is not a style change for its
