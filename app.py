@@ -118,18 +118,13 @@ if page in DATE_FILTERED:
     # choose, so its position is reserved here and filled once they have been read.
     line_slot = st.empty()
 
-    # One line, packed left. Two columns only: adding a spacer column costs another
-    # gap and renormalises the weights, which shrank BOTH filter columns instead of
-    # absorbing the remainder. Measured needs are 276px and 725px; this split leaves
-    # each comfortably clear, because an exact fit is not a fit.
     show_source = page in SOURCE_FILTERED
-    # Weights derived from Streamlit's actual flex basis, not from a share of the
-    # container: gap="large" makes each column calc(N% - 64px), so 64px per column is
-    # spent on the gap before any content. Measured chips need 302px (3 date) and 416px
-    # (first 4 source). 30 / 40 / 30 lands ~327px and ~436px, which holds 3 date chips
-    # on one row and exactly 4 source chips -- a 5th needs 511px and wraps. The third
-    # column is a spacer; without it the first two stretch and a 5th chip fits.
-    f1, f2, _pad = st.columns([240, 330, 430], gap="large")
+    # The columns only POSITION the two groups; each group's WIDTH is pinned in CSS by
+    # its option count, so where it wraps no longer depends on the viewport. Balancing
+    # chip width against column width held only at the one width I tested at -- on a
+    # narrower screen Date range broke to 1+2 and Source to 2-per-row. This split puts
+    # Source to the right of Date range with the large gap between them.
+    f1, f2 = st.columns([1, 1.7], gap="large")
     with f1:
         st.markdown('<div class="dg-fl">Date range</div>', unsafe_allow_html=True)
         wlabel = st.radio("Date range", list(WINDOWS), horizontal=True,

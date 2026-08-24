@@ -182,9 +182,17 @@ def css() -> str:
 
   /* --- filter chips: a real control, it moves every tile --- */
   div[role="radiogroup"] {{ gap:6px !important; }}
-  /* No blanket max-width: the two groups need different widths (3 chips on one
-     row vs 4 per row), so their COLUMNS govern where each wraps. One cap for
-     both cannot express two different layouts. */
+  /* Each group's width is PINNED, keyed on how many options it has -- not left to a
+     proportional column, which is what made the wrap break on a narrower viewport.
+     :has(label:nth-child(N)) keys on the option count, which is stable, rather than on
+     DOM position, which is not.
+       3 options  -> Date range, 256px, all three on one row
+       8 options  -> Source, 356px, exactly 4 per row so the 8 land 4 + 4
+     Change the chip padding and these two numbers move with it; they are the only two
+     places that need touching. */
+  div[role="radiogroup"]:has(label:nth-child(3)):not(:has(label:nth-child(4))) {{
+      width:256px; }}
+  div[role="radiogroup"]:has(label:nth-child(8)) {{ width:356px; }}
   /* The box hugs its text. Padding was 8px 17px, so a 68px word sat in a 104px chip --
      the border was 53% wider than the thing it enclosed.
      The radius drops from 999px to 6px with it, and that is not a style change for its
