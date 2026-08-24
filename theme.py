@@ -39,11 +39,13 @@ def css() -> str:
   .block-container {{ padding-top:3.6rem; padding-bottom:2rem; max-width:1500px; }}
   [data-testid="stVerticalBlock"] {{ gap:0.35rem !important; }}
 
-  .dg-top {{ display:flex; align-items:baseline; gap:11px;
-             padding-bottom:13px; border-bottom:1px solid {BORDER_SOFT}; margin-bottom:20px; }}
-  .dg-mark {{ font-family:{MONO}; font-size:19px; font-weight:700;
-              letter-spacing:.2em; color:{ACCENT}; }}
-  .dg-tag {{ font-size:11px; letter-spacing:.16em; text-transform:uppercase; color:{DIM}; }}
+  /* Masthead is the wordmark alone -- the tagline it used to carry said nothing a
+     reader of this page needs, and competed with the greeting directly beneath it. */
+  .dg-top {{ padding-bottom:15px; border-bottom:1px solid {BORDER_SOFT};
+             margin-bottom:22px; }}
+  .dg-logo {{ font-family:{MONO}; font-size:30px; font-weight:700;
+              letter-spacing:.16em; color:{ACCENT}; line-height:1;
+              display:inline-block; }}
 
   .dg-h1 {{ font-size:27px; font-weight:600; color:{TEXT}; margin:0 0 7px; }}
   .dg-complete {{ font-family:{MONO}; font-size:12px; color:{MUTED}; margin:0 0 22px; }}
@@ -83,9 +85,16 @@ def css() -> str:
       background:transparent; font-size:12px; margin:0 !important; }}
   /* The dot carries nothing the border and text colour do not already say, and it
      costs a third of the chip's width. Streamlit's own class rules are more specific
-     than a bare selector, hence !important. */
-  div[role="radiogroup"] label > div:first-child {{ display:none !important; }}
-  div[role="radiogroup"] label input {{ display:none !important; }}
+     than a bare selector, hence !important. Several selectors on purpose: the checked
+     state has been rendered with a different inner structure than the unchecked one,
+     so matching only one shape leaves a dot behind on the selected chip. */
+  div[role="radiogroup"] label > div:first-child,
+  div[role="radiogroup"] label > div:first-of-type,
+  div[role="radiogroup"] label [data-baseweb="radio"],
+  div[role="radiogroup"] label [role="radio"],
+  div[role="radiogroup"] label svg,
+  div[role="radiogroup"] label input,
+  div[role="radiogroup"] label input[type="radio"] {{ display:none !important; }}
   /* The <p> carries its own colour, so setting it on the label does nothing. */
   div[role="radiogroup"] label p {{
       font-size:12px !important; color:{CHIP_TEXT} !important; }}

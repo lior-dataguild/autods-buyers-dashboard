@@ -120,11 +120,8 @@ def buyers_chart(t: dict, s) -> None:
 
 
 # ---------------------------------------------------------------- page
-st.markdown(
-    '<div class="dg-top"><span class="dg-mark">DG</span>'
-    '<span class="dg-tag">Data Guild &nbsp;·&nbsp; analytics, in-house</span></div>',
-    unsafe_allow_html=True,
-)
+st.markdown('<div class="dg-top"><span class="dg-logo">DG</span></div>',
+            unsafe_allow_html=True)
 st.markdown('<div class="dg-h1">Hello Lior</div>', unsafe_allow_html=True)
 
 f1, f2 = st.columns([1, 1.55], gap="large")
