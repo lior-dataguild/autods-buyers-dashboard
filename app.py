@@ -68,16 +68,16 @@ st.markdown(f'<div class="dg-h1">{page}</div>', unsafe_allow_html=True)
 # ------------------------------------------------------------- filters
 days, channel, t, d = None, data.ALL, None, None
 if page in FILTERED:
-    f1, f2 = st.columns([1, 1.55], gap="large")
-    with f1:
-        st.markdown('<div class="dg-fl">Date range</div>', unsafe_allow_html=True)
-        wlabel = st.radio("Date range", list(WINDOWS), horizontal=True,
-                          label_visibility="collapsed")
-    with f2:
-        st.markdown('<div class="dg-fl">Source</div>', unsafe_allow_html=True)
-        channel = st.radio("Source", SOURCES, horizontal=True,
-                           label_visibility="collapsed",
-                           format_func=lambda s: s.replace("_", " "))
+    # Stacked rather than side-by-side: both rows start at the same left edge, so the
+    # eye drops straight down the labels instead of jumping across a gutter.
+    st.markdown('<div class="dg-fl">Date range</div>', unsafe_allow_html=True)
+    wlabel = st.radio("Date range", list(WINDOWS), horizontal=True,
+                      label_visibility="collapsed")
+    st.markdown('<div class="dg-fl" style="margin-top:14px">Source</div>',
+                unsafe_allow_html=True)
+    channel = st.radio("Source", SOURCES, horizontal=True,
+                       label_visibility="collapsed",
+                       format_func=lambda s: s.replace("_", " "))
     days = WINDOWS[wlabel]
     t = data.totals(days, channel)
     d = data.daily(days, channel)

@@ -35,11 +35,14 @@ AD_DATE = "period_start"
 
 ALL = "All channels"
 
-# user.acquisition_channel, ordered by row count. Whitelisted rather than interpolated
-# from user input.
+# Selectable sources. Whitelisted rather than interpolated from user input.
+#
+# user.acquisition_channel also holds `content_seo` and `email`; both are deliberately
+# not offered as individual selections. Their rows are still inside "All channels", so
+# the all-up figures are unchanged -- they simply cannot be isolated from the UI.
 CHANNELS = [
     "paid_search", "paid_social", "youtube_ads", "tiktok_ads",
-    "content_seo", "email", "organic_direct", "referral", "affiliate",
+    "organic_direct", "referral", "affiliate",
 ]
 
 # marketing_campaign.channel carries only these. The three acquisition channels absent
