@@ -14,6 +14,16 @@ PROJECT_ID = "dg-demo-data"
 DATASET = "demo_autods_demo_v1_v1"
 D = f"`{PROJECT_ID}.{DATASET}"
 
+# Bump whenever the RETURN SHAPE of a cached function below changes.
+#
+# Streamlit Cloud hot-reloads new code into the running process without restarting it,
+# so st.cache_data entries computed by the previous version can survive the update and
+# be handed to code that expects a different shape. That happened once here: the new
+# app.py asked for t["cur"] while the cache still held the old flat dict, and the app
+# died with a bare KeyError. Threading this constant through the cache key makes a
+# shape change invalidate the cache instead of relying on a manual reboot.
+_CACHE_V = 2
+
 # A purchase = a SUCCEEDED payment that is not a refund or chargeback. Both filters are
 # load-bearing: 14.9% of payment rows are not succeeded, and this dataset stores refunds
 # and chargebacks as POSITIVE rows, so they would otherwise count as purchases.
@@ -96,7 +106,7 @@ def _derive(r) -> dict:
 
 
 @st.cache_data(ttl=3600, show_spinner=False)
-def totals(days: int) -> dict:
+def _totals(days: int, cache_v: int) -> dict:
     df = client().query(_components_sql(days)).to_dataframe()
     cur = df[df["per"] == "cur"].iloc[0]
     pri = df[df["per"] == "pri"].iloc[0]
@@ -108,8 +118,12 @@ def totals(days: int) -> dict:
     return out
 
 
+def totals(days: int) -> dict:
+    return _totals(days, _CACHE_V)
+
+
 @st.cache_data(ttl=3600, show_spinner=False)
-def daily(days: int) -> pd.DataFrame:
+def _daily(days: int, cache_v: int) -> pd.DataFrame:
     """One row per calendar day, built off a date spine so a quiet day is a real zero
     (B19) rather than a gap the line would silently bridge. Ratios are computed inside
     each day, never scaled from the window total (B3)."""
@@ -154,3 +168,7 @@ def daily(days: int) -> pd.DataFrame:
     for c in ("net_revenue", "purchases", "customers", "refund_pct", "cm_pct", "mer"):
         df[c] = pd.to_numeric(df[c], errors="coerce")
     return df
+
+
+def daily(days: int) -> pd.DataFrame:
+    return _daily(days, _CACHE_V)
