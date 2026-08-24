@@ -60,7 +60,7 @@ def css() -> str:
             color:{DIM}; margin:0; padding-bottom:18px; }}
   .dg-rule {{ height:1px; background:{BORDER_SOFT}; margin:22px 0 20px; }}
   .dg-blank {{ font-size:16px; font-weight:600; color:#3A4653; }}
-  .dg-navgap {{ height:4px; }}
+  .dg-navgap {{ height:24px; }}
 
   /* --- sidebar navigation -------------------------------------------------
      Scoped by ancestor, so the main page's chip rules cannot leak in and the
@@ -90,19 +90,34 @@ def css() -> str:
   .dg-navactive {{ border-left:2px solid {ACCENT}; background:rgba(34,211,238,.09);
       padding:8px 12px 8px 12px; font-size:13px; font-weight:600; color:{ACCENT}; }}
 
-  /* Group headers: tap to open. Collapsed by default so the whole suite is not on
-     screen at once. */
+  /* Group headers: tap to open. A group header is a nav row, so it gets the same
+     visual language as one -- flat, full-width, square, with a left-edge cue. Streamlit
+     ships them as rounded cards with a 1.5px focus ring, which read as floating boxes
+     against a flat rail. */
   section[data-testid="stSidebar"] [data-testid="stExpander"] {{
-      margin:22px 0 0 !important; border:0 !important; }}
+      margin:10px 0 0 !important; border:0 !important; border-radius:0 !important; }}
+  section[data-testid="stSidebar"] [data-testid="stExpander"] details {{
+      border-radius:0 !important; }}
   section[data-testid="stSidebar"] [data-testid="stExpander"] summary {{
-      padding:8px 14px 11px !important; }}
+      padding:7px 14px 7px 12px !important; border-radius:0 !important;
+      border-left:2px solid transparent !important; }}
   section[data-testid="stSidebar"] [data-testid="stExpander"] summary p {{
       font-size:10px !important; letter-spacing:.13em; text-transform:uppercase;
       font-weight:700 !important; color:{DIM} !important; }}
+  section[data-testid="stSidebar"] [data-testid="stExpander"] summary:hover {{
+      background:rgba(255,255,255,.04) !important; }}
   section[data-testid="stSidebar"] [data-testid="stExpander"] summary:hover p {{
       color:{CHIP_TEXT} !important; }}
+  /* Keyboard focus must stay visible, but as the same left-edge cue the items use --
+     not a rounded ring around a flat row. */
+  section[data-testid="stSidebar"] [data-testid="stExpander"] summary:focus,
+  section[data-testid="stSidebar"] [data-testid="stExpander"] summary:focus-visible {{
+      outline:none !important; box-shadow:none !important;
+      border-left-color:{ACCENT} !important; }}
+  /* Space between an open group's title and its first item lives here, so a COLLAPSED
+     group stays compact instead of carrying padding it does not need. */
   section[data-testid="stSidebar"] [data-testid="stExpander"] details > div {{
-      padding:0 !important; }}
+      padding:5px 0 2px 0 !important; }}
   section[data-testid="stSidebar"] [data-testid="stVerticalBlock"] {{
       gap:0 !important; }}
   .dg-soon {{ font-size:11px; color:{DIM}; padding:0 14px; margin-top:3px; }}
